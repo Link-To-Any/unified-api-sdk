@@ -1,0 +1,57 @@
+{
+  "name": "@linktoany/uniflow-sdk",
+  "version": "0.1.0",
+  "description": "Official Node.js / TypeScript SDK for the LinkToAny Uniflow Unified API — auth, account connection and unified entity execution.",
+  "license": "UNLICENSED",
+  "author": "LinkToAny",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Link-To-Any/unified-api-sdk.git"
+  },
+  "homepage": "https://github.com/Link-To-Any/unified-api-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/Link-To-Any/unified-api-sdk/issues"
+  },
+  "keywords": [
+    "linktoany",
+    "uniflow",
+    "unified-api",
+    "integration",
+    "sdk"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "commonjs",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "clean": "rm -rf dist docs",
+    "docs": "typedoc",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "tsx --test test/*.test.ts",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.19.0",
+    "typedoc": "^0.26.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -77,7 +77,7 @@ export class HttpClient {
       'content-type': 'application/json',
       accept: 'application/json',
       'x-api-key': options.apiKey,
-      'user-agent': 'uniflow-sdk-node/0.1.0',
+      'user-agent': 'unified-api-sdk-node/0.1.0',
       ...(options.organisationId ? { 'x-posx-organisation-id': options.organisationId } : {}),
       ...(options.userId ? { 'x-posx-user-id': options.userId } : {}),
       ...(options.applicationId ? { 'x-posx-application-id': options.applicationId } : {}),

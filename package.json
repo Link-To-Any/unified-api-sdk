@@ -2,7 +2,7 @@
   "name": "@linktoany/uniflow-sdk",
   "version": "0.1.0",
   "description": "Official Node.js / TypeScript SDK for the LinkToAny Uniflow Unified API — auth, account connection and unified entity execution.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "LinkToAny",
   "repository": {
     "type": "git",
@@ -35,7 +35,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "npm run build:cjs && npm run build:esm && npm run build:types",

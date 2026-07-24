@@ -16,8 +16,8 @@ import type { RequestOptions, UniflowClientOptions, UniflowEnvironment } from '.
 
 /** Base URL per environment. */
 const BASE_URLS: Record<UniflowEnvironment, string> = {
-  dev: 'https://uniflow.staging.linktoany.com',
-  prod: 'https://uniflow.linktoany.com'
+  dev: 'https://api.staging.linktoany.com',
+  prod: 'https://api.linktoany.com'
 };
 
 /** Statuses retried automatically. */
@@ -76,8 +76,8 @@ export class HttpClient {
     this.headers = {
       'content-type': 'application/json',
       accept: 'application/json',
-      'x-api-key': options.apiKey,
-      'user-agent': 'unified-api-sdk-node/0.1.0',
+      authorization: `Bearer ${options.apiKey}`,
+      'user-agent': 'unified-api-sdk-node/0.2.0',
       ...(options.organisationId ? { 'x-posx-organisation-id': options.organisationId } : {}),
       ...(options.userId ? { 'x-posx-user-id': options.userId } : {}),
       ...(options.applicationId ? { 'x-posx-application-id': options.applicationId } : {}),

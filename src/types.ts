@@ -29,15 +29,15 @@ export interface ApiResponse<T> {
  */
 export interface UniflowClientOptions {
   /**
-   * API key sent as the `x-api-key` header.
+   * API key sent as the `Authorization: Bearer <key>` header.
    * Use an admin key for write operations, public key for read-only.
    */
   apiKey: string;
   /**
    * Which environment to target.
    *
-   * - `'dev'`  → `https://uniflow.staging.linktoany.com`
-   * - `'prod'` → `https://uniflow.linktoany.com`
+   * - `'dev'`  → `https://api.staging.linktoany.com`
+   * - `'prod'` → `https://api.linktoany.com`
    *
    * @defaultValue `'prod'`
    */

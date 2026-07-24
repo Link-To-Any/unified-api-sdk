@@ -55,7 +55,7 @@ export class RecordsResource {
   ): Promise<UnifiedRecordsPage<T>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/unified/${encodeURIComponent(accountId)}/${encodeURIComponent(entityType)}`,
+      path: `/unified/${encodeURIComponent(accountId)}/${encodeURIComponent(entityType)}`,
       query: query as Record<string, QueryValue>,
       options
     });
@@ -133,7 +133,7 @@ export class RecordsResource {
   ): Promise<UnifiedWriteResult> {
     return this.http.request({
       method: 'POST',
-      path: `/api/unified/${encodeURIComponent(accountId)}/${encodeURIComponent(entityType)}`,
+      path: `/unified/${encodeURIComponent(accountId)}/${encodeURIComponent(entityType)}`,
       query: query as Record<string, QueryValue>,
       body: record,
       options

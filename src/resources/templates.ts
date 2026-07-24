@@ -7,6 +7,7 @@
  */
 
 import type { HttpClient } from '../http.js';
+import { normalizeListResponse } from '../normalize.js';
 import type {
   ApiResponse,
   CreateUnifiedTemplateRequest,
@@ -30,19 +31,24 @@ export class TemplatesResource {
     body: CreateUnifiedTemplateRequest,
     options?: RequestOptions
   ): Promise<ApiResponse<UnifiedVerticalTemplate>> {
-    return this.http.request({ method: 'POST', path: '/api/unified/templates', body, options });
+    return this.http.request({ method: 'POST', path: '/unified/templates', body, options });
   }
 
   /** List all vertical templates. */
-  list(options?: RequestOptions): Promise<ApiResponse<UnifiedVerticalTemplate[]>> {
-    return this.http.request({ method: 'GET', path: '/api/unified/templates', options });
+  async list(options?: RequestOptions): Promise<ApiResponse<UnifiedVerticalTemplate[]>> {
+    const response = await this.http.request<ApiResponse<unknown>>({
+      method: 'GET',
+      path: '/unified/templates',
+      options
+    });
+    return normalizeListResponse<UnifiedVerticalTemplate>(response, 'templates');
   }
 
   /** Fetch the template for a vertical (e.g. `retail`). */
   get(vertical: string, options?: RequestOptions): Promise<ApiResponse<UnifiedVerticalTemplate>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/unified/templates/${encodeURIComponent(vertical)}`,
+      path: `/unified/templates/${encodeURIComponent(vertical)}`,
       options
     });
   }

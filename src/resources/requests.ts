@@ -6,6 +6,7 @@
  */
 
 import type { HttpClient, QueryValue } from '../http.js';
+import { normalizeListResponse } from '../normalize.js';
 import type {
   ApiResponse,
   ListUnifiedRequestsQuery,
@@ -34,23 +35,24 @@ export class RequestsResource {
    * const failed = await client.requests.list({ accountId, success: false });
    * ```
    */
-  list(
+  async list(
     query: ListUnifiedRequestsQuery = {},
     options?: RequestOptions
   ): Promise<ApiResponse<UnifiedApiRequestLog[]>> {
-    return this.http.request({
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: '/api/unified/requests',
+      path: '/unified/requests',
       query: query as Record<string, QueryValue>,
       options
     });
+    return normalizeListResponse<UnifiedApiRequestLog>(response, 'requests');
   }
 
   /** Fetch a single logged request with full detail. */
   get(requestId: ObjectId, options?: RequestOptions): Promise<ApiResponse<UnifiedApiRequestLog>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/unified/requests/${encodeURIComponent(requestId)}`,
+      path: `/unified/requests/${encodeURIComponent(requestId)}`,
       options
     });
   }

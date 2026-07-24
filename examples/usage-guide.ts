@@ -21,7 +21,7 @@
  *   # Mock mode (default — no credentials, no network; great first run)
  *   npx tsx examples/usage-guide.ts
  *
- *   # Live mode (against uniflow.staging.linktoany.com)
+ *   # Live mode (against api.staging.linktoany.com)
  *   UNIFLOW_API_KEY=...  UNIFLOW_SYSTEM_ID=...  npx tsx examples/usage-guide.ts
  *
  * Live-mode env vars:
@@ -57,10 +57,10 @@ function heading(title: string): void {
 // 1. Create a client
 // ---------------------------------------------------------------------------
 //
-// environment: 'dev'  → https://uniflow.staging.linktoany.com
-// environment: 'prod' → https://uniflow.linktoany.com   (default)
+// environment: 'dev'  → https://api.staging.linktoany.com
+// environment: 'prod' → https://api.linktoany.com   (default)
 //
-// The API key is sent as `x-api-key`. organisationId / userId /
+// The API key is sent as `Authorization: Bearer <key>`. organisationId / userId /
 // applicationId become tenant-context headers on every request.
 
 const client = new UniflowClient({
@@ -272,30 +272,30 @@ function mockUnifiedApi(): typeof fetch {
     if (path === '/health') {
       return json({ status: 'healthy', service: 'flow-unified-api', timestamp: 'now', version: '1.0.0' });
     }
-    if (path === '/api/account/system' && method === 'GET') {
+    if (path === '/account/system' && method === 'GET') {
       return json({ success: true, data: [
         { _id: SYSTEM_ID, name: 'Shopify', status: 'active' },
         { _id: 'd4e5f6a1b2c3d4e5f6a1b2c3', name: 'QuickBooks', status: 'active' }
       ] });
     }
-    if (path === `/api/account/system/${SYSTEM_ID}`) {
+    if (path === `/account/system/${SYSTEM_ID}`) {
       return json({ success: true, data: {
         _id: SYSTEM_ID, name: 'Shopify', description: 'E-commerce platform',
         supportedAuthTypes: ['oauth2'], status: 'active'
       } });
     }
-    if (path === '/api/system-integration/sync-configs') {
+    if (path === '/system-integration/sync-configs') {
       return json({ success: true, data: [
         { _id: '1'.repeat(24), systemId: SYSTEM_ID, entityType: 'order', availableFilters: FILTERS },
         { _id: '2'.repeat(24), systemId: SYSTEM_ID, entityType: 'product', availableFilters: [] }
       ] });
     }
-    if (path === '/api/system-integration/configs') {
+    if (path === '/system-integration/configs') {
       return json({ success: true, data: [
         { _id: '3'.repeat(24), systemId: SYSTEM_ID, entityType: 'product', action: 'create' }
       ] });
     }
-    if (path === '/api/unified' && method === 'GET') {
+    if (path === '/unified' && method === 'GET') {
       return json({ success: true, data: [
         {
           entityType: 'orders', unifiedZodSchema: 'z.object({...})',
@@ -309,7 +309,7 @@ function mockUnifiedApi(): typeof fetch {
         }
       ] });
     }
-    if (path.startsWith('/api/account/start/')) {
+    if (path.startsWith('/account/start/')) {
       return json({
         success: true, message: 'ok', systemId: SYSTEM_ID, application: 'shopify',
         data: { authType: 'oauth', authUrl: 'https://demo-store.myshopify.com/admin/oauth/authorize?...', instructions: 'Redirect user to authUrl' }
@@ -321,7 +321,7 @@ function mockUnifiedApi(): typeof fetch {
     if (path.endsWith('/token-status')) {
       return json({ success: true, data: { valid: true, expiresAt: '2027-01-01T00:00:00Z' } });
     }
-    if (path === `/api/unified/${ACCOUNT_ID}/orders` && method === 'GET') {
+    if (path === `/unified/${ACCOUNT_ID}/orders` && method === 'GET') {
       const cursor = Number(url.searchParams.get('cursor') ?? 0);
       const pageSize = Number(url.searchParams.get('pageSize') ?? 100);
       const slice = ORDERS.slice(cursor, cursor + pageSize);
@@ -331,26 +331,26 @@ function mockUnifiedApi(): typeof fetch {
         pagination: { cursor: next < ORDERS.length ? String(next) : null, hasMore: next < ORDERS.length, pageSize }
       });
     }
-    if (path === `/api/unified/${ACCOUNT_ID}/products` && method === 'POST') {
+    if (path === `/unified/${ACCOUNT_ID}/products` && method === 'POST') {
       const record = JSON.parse(String(init?.body ?? '{}'));
       return json({ success: true, data: [{ key: 'shopify', status: 'created', externalId: 'prod_991', input: record.sku }] });
     }
-    if (path === '/api/unified/generate' && method === 'POST') {
+    if (path === '/unified/generate' && method === 'POST') {
       return json({ success: true, data: { _id: '9'.repeat(24), status: 'processing' } }, 202);
     }
-    if (path === `/api/unified/generate/${'9'.repeat(24)}`) {
+    if (path === `/unified/generate/${'9'.repeat(24)}`) {
       return json({ success: true, data: { _id: '9'.repeat(24), status: 'completed', entities: ['orders'] } });
     }
-    if (path === '/api/unified/requests') {
+    if (path === '/unified/requests') {
       return json({ success: true, data: [
         { _id: '5'.repeat(24), method: 'GET', entityType: 'orders', statusCode: 200, success: true },
         { _id: '6'.repeat(24), method: 'POST', entityType: 'products', statusCode: 200, success: true }
       ] });
     }
-    if (path === '/api/unified/rate-limits') {
+    if (path === '/unified/rate-limits') {
       return json({ success: true, data: [{ _id: '7'.repeat(24), requestsPerMinute: 120, enabled: true }] });
     }
-    if (path.startsWith(`/api/unified/${'0'.repeat(24)}/`)) {
+    if (path.startsWith(`/unified/${'0'.repeat(24)}/`)) {
       return json({ success: false, message: 'Account not found', code: 'NOT_FOUND' }, 404);
     }
     return json({ success: false, message: `mock: no route for ${method} ${path}` }, 404);

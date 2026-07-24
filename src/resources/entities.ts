@@ -7,6 +7,7 @@
  */
 
 import type { HttpClient, QueryValue } from '../http.js';
+import { normalizeListResponse } from '../normalize.js';
 import type {
   ApiResponse,
   GenerateUnifiedContractsRequest,
@@ -33,16 +34,17 @@ export class EntitiesResource {
    * List unified entity contracts — each contract defines an entity's
    * unified schema and how it maps onto integrations.
    */
-  list(
+  async list(
     query: ListUnifiedContractsQuery = {},
     options?: RequestOptions
   ): Promise<ApiResponse<UnifiedContract[]>> {
-    return this.http.request({
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: '/api/unified',
+      path: '/unified',
       query: query as Record<string, QueryValue>,
       options
     });
+    return normalizeListResponse<UnifiedContract>(response, 'contracts');
   }
 
   /**
@@ -61,7 +63,7 @@ export class EntitiesResource {
   ): Promise<ApiResponse<UnifiedContract>> {
     return this.http.request({
       method: 'PUT',
-      path: `/api/unified/${encodeURIComponent(entityType)}`,
+      path: `/unified/${encodeURIComponent(entityType)}`,
       body,
       options
     });
@@ -85,7 +87,7 @@ export class EntitiesResource {
     body: GenerateUnifiedContractsRequest,
     options?: RequestOptions
   ): Promise<ApiResponse<GenerationTask>> {
-    return this.http.request({ method: 'POST', path: '/api/unified/generate', body, options });
+    return this.http.request({ method: 'POST', path: '/unified/generate', body, options });
   }
 
   /** Fetch the state of an async contract-generation task. */
@@ -95,7 +97,7 @@ export class EntitiesResource {
   ): Promise<ApiResponse<GenerationTask>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/unified/generate/${encodeURIComponent(taskId)}`,
+      path: `/unified/generate/${encodeURIComponent(taskId)}`,
       options
     });
   }

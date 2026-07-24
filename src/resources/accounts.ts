@@ -6,6 +6,7 @@
  */
 
 import type { HttpClient } from '../http.js';
+import { normalizeListResponse } from '../normalize.js';
 import type {
   Account,
   ApiResponse,
@@ -33,19 +34,28 @@ export class AccountsResource {
    * require OAuth or credential validation.
    */
   create(body: CreateAccountRequest, options?: RequestOptions): Promise<ApiResponse<Account>> {
-    return this.http.request({ method: 'POST', path: '/api/account', body, options });
+    return this.http.request({ method: 'POST', path: '/account', body, options });
   }
 
   /** List accounts, optionally filtered and paginated. */
-  list(query: ListAccountsQuery = {}, options?: RequestOptions): Promise<ApiResponse<Account[]>> {
-    return this.http.request({ method: 'GET', path: '/api/account', query, options });
+  async list(
+    query: ListAccountsQuery = {},
+    options?: RequestOptions
+  ): Promise<ApiResponse<Account[]>> {
+    const response = await this.http.request<ApiResponse<unknown>>({
+      method: 'GET',
+      path: '/account',
+      query,
+      options
+    });
+    return normalizeListResponse<Account>(response, 'accounts');
   }
 
   /** Fetch a single account by id. */
   get(accountId: ObjectId, options?: RequestOptions): Promise<ApiResponse<Account>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/account/${encodeURIComponent(accountId)}`,
+      path: `/account/${encodeURIComponent(accountId)}`,
       options
     });
   }
@@ -58,7 +68,7 @@ export class AccountsResource {
   ): Promise<ApiResponse<Account>> {
     return this.http.request({
       method: 'PUT',
-      path: `/api/account/${encodeURIComponent(accountId)}`,
+      path: `/account/${encodeURIComponent(accountId)}`,
       body,
       options
     });
@@ -71,27 +81,35 @@ export class AccountsResource {
   delete(accountId: ObjectId, options?: RequestOptions): Promise<ApiResponse<unknown>> {
     return this.http.request({
       method: 'DELETE',
-      path: `/api/account/${encodeURIComponent(accountId)}`,
+      path: `/account/${encodeURIComponent(accountId)}`,
       options
     });
   }
 
   /** List accounts connected to a given integration. */
-  listBySystem(systemId: ObjectId, options?: RequestOptions): Promise<ApiResponse<Account[]>> {
-    return this.http.request({
+  async listBySystem(
+    systemId: ObjectId,
+    options?: RequestOptions
+  ): Promise<ApiResponse<Account[]>> {
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: `/api/account/system/${encodeURIComponent(systemId)}`,
+      path: `/account/system/${encodeURIComponent(systemId)}`,
       options
     });
+    return normalizeListResponse<Account>(response, 'accounts');
   }
 
   /** List all accounts belonging to a merchant. */
-  listByMerchant(merchantId: string, options?: RequestOptions): Promise<ApiResponse<Account[]>> {
-    return this.http.request({
+  async listByMerchant(
+    merchantId: string,
+    options?: RequestOptions
+  ): Promise<ApiResponse<Account[]>> {
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: `/api/account/merchant/${encodeURIComponent(merchantId)}`,
+      path: `/account/merchant/${encodeURIComponent(merchantId)}`,
       options
     });
+    return normalizeListResponse<Account>(response, 'accounts');
   }
 
   /**
@@ -106,7 +124,7 @@ export class AccountsResource {
   ): Promise<ApiResponse<Account>> {
     return this.http.request({
       method: 'PUT',
-      path: `/api/account/${encodeURIComponent(accountId)}/tokens`,
+      path: `/account/${encodeURIComponent(accountId)}/tokens`,
       body: { tokenInfo, ...(externalAccountInfo ? { externalAccountInfo } : {}) },
       options
     });

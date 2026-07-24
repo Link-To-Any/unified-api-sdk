@@ -79,17 +79,17 @@ function okClient(
 describe('UniflowClient construction', () => {
   it("resolves 'dev' to the staging base URL", () => {
     const client = new UniflowClient({ apiKey: 'k', environment: 'dev' });
-    assert.equal(client.baseUrl, 'https://uniflow.staging.linktoany.com');
+    assert.equal(client.baseUrl, 'https://api.staging.linktoany.com');
   });
 
   it("resolves 'prod' to the production base URL", () => {
     const client = new UniflowClient({ apiKey: 'k', environment: 'prod' });
-    assert.equal(client.baseUrl, 'https://uniflow.linktoany.com');
+    assert.equal(client.baseUrl, 'https://api.linktoany.com');
   });
 
   it('defaults to prod when environment is omitted', () => {
     const client = new UniflowClient({ apiKey: 'k' });
-    assert.equal(client.baseUrl, 'https://uniflow.linktoany.com');
+    assert.equal(client.baseUrl, 'https://api.linktoany.com');
   });
 
   it('lets baseUrl override the environment and strips trailing slashes', () => {
@@ -127,7 +127,7 @@ describe('request headers', () => {
     await client.accounts.get(OID_A);
 
     const headers = calls[0]!.headers;
-    assert.equal(headers['x-api-key'], 'test-key');
+    assert.equal(headers['authorization'], 'Bearer test-key');
     assert.equal(headers['x-posx-organisation-id'], 'org-1');
     assert.equal(headers['x-posx-user-id'], 'user-1');
     assert.equal(headers['x-posx-application-id'], 'app-1');
@@ -166,7 +166,7 @@ describe('query serialization', () => {
     });
 
     const url = new URL(calls[0]!.url);
-    assert.equal(url.pathname, `/api/unified/${OID_A}/products`);
+    assert.equal(url.pathname, `/unified/${OID_A}/products`);
     assert.equal(url.searchParams.get('pageSize'), '50');
     assert.equal(url.searchParams.get('filters[status]'), 'active');
     assert.equal(url.searchParams.get('filters[vendor]'), 'acme');
@@ -185,7 +185,7 @@ describe('query serialization', () => {
   it('URL-encodes path segments', async () => {
     const { client, calls } = okClient([{ status: 200, body: { success: true, data: [] } }]);
     await client.records.list(OID_A, 'sales orders');
-    assert.ok(calls[0]!.url.endsWith(`/api/unified/${OID_A}/sales%20orders`));
+    assert.ok(calls[0]!.url.endsWith(`/unified/${OID_A}/sales%20orders`));
   });
 });
 
@@ -362,7 +362,7 @@ describe('auth resource', () => {
     });
 
     assert.equal(calls[0]!.method, 'POST');
-    assert.ok(calls[0]!.url.endsWith(`/api/account/start/${OID_A}/shopify`));
+    assert.ok(calls[0]!.url.endsWith(`/account/start/${OID_A}/shopify`));
     assert.deepEqual(JSON.parse(calls[0]!.body!), {
       merchantId: 'm-1',
       shop: 'demo.myshopify.com'
@@ -386,9 +386,9 @@ describe('auth resource', () => {
     await client.auth.getTokenStatus(OID_A);
 
     assert.equal(calls[0]!.method, 'POST');
-    assert.ok(calls[0]!.url.endsWith(`/api/account/${OID_A}/refresh-token`));
+    assert.ok(calls[0]!.url.endsWith(`/account/${OID_A}/refresh-token`));
     assert.equal(calls[1]!.method, 'GET');
-    assert.ok(calls[1]!.url.endsWith(`/api/account/${OID_A}/token-status`));
+    assert.ok(calls[1]!.url.endsWith(`/account/${OID_A}/token-status`));
   });
 });
 
@@ -410,13 +410,13 @@ describe('accounts resource', () => {
 
     const seen = calls.map(c => `${c.method} ${new URL(c.url).pathname}`);
     assert.deepEqual(seen, [
-      'POST /api/account',
-      'GET /api/account',
-      `GET /api/account/${OID_A}`,
-      `PUT /api/account/${OID_A}`,
-      `DELETE /api/account/${OID_A}`,
-      `GET /api/account/system/${OID_B}`,
-      'GET /api/account/merchant/m%201'
+      'POST /account',
+      'GET /account',
+      `GET /account/${OID_A}`,
+      `PUT /account/${OID_A}`,
+      `DELETE /account/${OID_A}`,
+      `GET /account/system/${OID_B}`,
+      'GET /account/merchant/m%201'
     ]);
     assert.equal(new URL(calls[1]!.url).searchParams.get('limit'), '10');
   });
@@ -425,7 +425,7 @@ describe('accounts resource', () => {
     const { client, calls } = okClient([{ status: 200, body: { success: true, data: {} } }]);
     await client.accounts.updateTokens(OID_A, { accessToken: 't' }, { shop: 's' });
 
-    assert.ok(calls[0]!.url.endsWith(`/api/account/${OID_A}/tokens`));
+    assert.ok(calls[0]!.url.endsWith(`/account/${OID_A}/tokens`));
     assert.deepEqual(JSON.parse(calls[0]!.body!), {
       tokenInfo: { accessToken: 't' },
       externalAccountInfo: { shop: 's' }
@@ -455,7 +455,7 @@ describe('unified records', () => {
     await client.records.create(OID_A, 'products', { sku: 'NEW' }, { unifiedApiId: OID_B });
 
     const url = new URL(calls[0]!.url);
-    assert.equal(url.pathname, `/api/unified/${OID_A}/products`);
+    assert.equal(url.pathname, `/unified/${OID_A}/products`);
     assert.equal(url.searchParams.get('unifiedApiId'), OID_B);
     assert.deepEqual(JSON.parse(calls[0]!.body!), { sku: 'NEW' });
   });
@@ -519,13 +519,13 @@ describe('unified contracts, templates, instances, logs', () => {
 
     const seen = calls.map(c => `${c.method} ${new URL(c.url).pathname}`);
     assert.deepEqual(seen, [
-      'PUT /api/unified/products',
-      'GET /api/unified/templates',
-      'GET /api/unified/templates/Retail',
-      'POST /api/unified/instance',
-      'GET /api/unified/instance',
-      'GET /api/unified/requests',
-      `GET /api/unified/requests/${OID_B}`
+      'PUT /unified/products',
+      'GET /unified/templates',
+      'GET /unified/templates/Retail',
+      'POST /unified/instance',
+      'GET /unified/instance',
+      'GET /unified/requests',
+      `GET /unified/requests/${OID_B}`
     ]);
     assert.equal(new URL(calls[5]!.url).searchParams.get('success'), 'false');
   });
@@ -540,7 +540,7 @@ describe('generation tasks', () => {
       systemIds: [OID_A],
       syncRequestConfigIds: [OID_B]
     });
-    assert.ok(calls[0]!.url.endsWith('/api/unified/generate'));
+    assert.ok(calls[0]!.url.endsWith('/unified/generate'));
     assert.equal(task._id, OID_B);
   });
 
@@ -579,13 +579,51 @@ describe('rate limits resource', () => {
 
     const seen = calls.map(c => `${c.method} ${new URL(c.url).pathname}`);
     assert.deepEqual(seen, [
-      'GET /api/unified/rate-limits',
-      'POST /api/unified/rate-limits',
-      `DELETE /api/unified/rate-limits/${OID_A}`
+      'GET /unified/rate-limits',
+      'POST /unified/rate-limits',
+      `DELETE /unified/rate-limits/${OID_A}`
     ]);
     assert.deepEqual(JSON.parse(calls[1]!.body!), {
       organisationId: 'org-1',
       requestsPerMinute: 120
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Gateway list-envelope normalization
+// ---------------------------------------------------------------------------
+
+describe('list response normalization', () => {
+  it('unwraps data.items envelopes (contracts, requests)', async () => {
+    const { client } = okClient([
+      { status: 200, body: { success: true, data: { items: [{ entityType: 'orders' }], pagination: { total: 1 } } } }
+    ]);
+    const { data } = await client.entities.list();
+    assert.deepEqual(data, [{ entityType: 'orders' }]);
+  });
+
+  it('unwraps resource-keyed envelopes (data.systems)', async () => {
+    const { client } = okClient([
+      { status: 200, body: { success: true, data: { systems: [{ _id: OID_A, name: 'BigCommerce' }] } } }
+    ]);
+    const { data } = await client.integrations.list();
+    assert.equal(data[0]!.name, 'BigCommerce');
+  });
+
+  it('passes plain arrays through untouched', async () => {
+    const { client } = okClient([
+      { status: 200, body: { success: true, data: [{ _id: OID_A }] } }
+    ]);
+    const { data } = await client.accounts.list();
+    assert.deepEqual(data, [{ _id: OID_A }]);
+  });
+
+  it('returns empty array for unrecognized envelope shapes', async () => {
+    const { client } = okClient([
+      { status: 200, body: { success: true, data: { weird: true } } }
+    ]);
+    const { data } = await client.templates.list();
+    assert.deepEqual(data, []);
   });
 });

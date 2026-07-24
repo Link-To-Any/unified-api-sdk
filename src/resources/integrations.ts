@@ -7,6 +7,7 @@
  */
 
 import type { HttpClient, QueryValue } from '../http.js';
+import { normalizeListResponse } from '../normalize.js';
 import type {
   ApiResponse,
   Integration,
@@ -37,11 +38,17 @@ export class IntegrationsResource {
   // -------------------------------------------------------------------------
 
   /** List all integrations, optionally filtered and paginated. */
-  list(
+  async list(
     query: ListIntegrationsQuery = {},
     options?: RequestOptions
   ): Promise<ApiResponse<Integration[]>> {
-    return this.http.request({ method: 'GET', path: '/api/account/system', query, options });
+    const response = await this.http.request<ApiResponse<unknown>>({
+      method: 'GET',
+      path: '/account/system',
+      query,
+      options
+    });
+    return normalizeListResponse<Integration>(response, 'systems');
   }
 
   /**
@@ -51,35 +58,36 @@ export class IntegrationsResource {
   get(systemId: ObjectId, options?: RequestOptions): Promise<ApiResponse<Integration>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/account/system/${encodeURIComponent(systemId)}`,
+      path: `/account/system/${encodeURIComponent(systemId)}`,
       options
     });
   }
 
   /** Aggregate statistics across all integrations. */
   getStats(options?: RequestOptions): Promise<ApiResponse<Record<string, unknown>>> {
-    return this.http.request({ method: 'GET', path: '/api/account/system/stats', options });
+    return this.http.request({ method: 'GET', path: '/account/system/stats', options });
   }
 
   /** List the auth types the Unified API supports for connecting accounts. */
   getSupportedAuthTypes(options?: RequestOptions): Promise<ApiResponse<IntegrationAuthType[]>> {
     return this.http.request({
       method: 'GET',
-      path: '/api/account/system/supported-auth-types',
+      path: '/account/system/supported-auth-types',
       options
     });
   }
 
   /** List integrations that support a given auth type (e.g. `oauth2`). */
-  listByAuthType(
+  async listByAuthType(
     authType: IntegrationAuthType,
     options?: RequestOptions
   ): Promise<ApiResponse<Integration[]>> {
-    return this.http.request({
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: `/api/account/system/auth-type/${encodeURIComponent(authType)}`,
+      path: `/account/system/auth-type/${encodeURIComponent(authType)}`,
       options
     });
+    return normalizeListResponse<Integration>(response, 'systems');
   }
 
   // -------------------------------------------------------------------------
@@ -99,16 +107,17 @@ export class IntegrationsResource {
    * }
    * ```
    */
-  listReadOperations(
+  async listReadOperations(
     query: ListReadOperationsQuery = {},
     options?: RequestOptions
   ): Promise<ApiResponse<ReadOperation[]>> {
-    return this.http.request({
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: '/api/system-integration/sync-configs',
+      path: '/system-integration/sync-configs',
       query: query as Record<string, QueryValue>,
       options
     });
+    return normalizeListResponse<ReadOperation>(response, 'configs', 'syncConfigs');
   }
 
   /**
@@ -116,16 +125,17 @@ export class IntegrationsResource {
    * integration accepts through unified POSTs and the actions it
    * supports.
    */
-  listWriteOperations(
+  async listWriteOperations(
     query: ListWriteOperationsQuery = {},
     options?: RequestOptions
   ): Promise<ApiResponse<WriteOperation[]>> {
-    return this.http.request({
+    const response = await this.http.request<ApiResponse<unknown>>({
       method: 'GET',
-      path: '/api/system-integration/configs',
+      path: '/system-integration/configs',
       query: query as Record<string, QueryValue>,
       options
     });
+    return normalizeListResponse<WriteOperation>(response, 'configs', 'pushConfigs');
   }
 
   /** Fetch a single write operation with full detail. */
@@ -135,7 +145,7 @@ export class IntegrationsResource {
   ): Promise<ApiResponse<WriteOperation>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/system-integration/configs/${encodeURIComponent(operationId)}`,
+      path: `/system-integration/configs/${encodeURIComponent(operationId)}`,
       options
     });
   }
@@ -147,7 +157,7 @@ export class IntegrationsResource {
   ): Promise<ApiResponse<Record<string, unknown>>> {
     return this.http.request({
       method: 'GET',
-      path: '/api/system-integration/schemas/templates',
+      path: '/system-integration/schemas/templates',
       query: query as Record<string, QueryValue>,
       options
     });
@@ -160,7 +170,7 @@ export class IntegrationsResource {
   ): Promise<ApiResponse<Record<string, unknown>>> {
     return this.http.request({
       method: 'GET',
-      path: '/api/system-integration/schemas/zod',
+      path: '/system-integration/schemas/zod',
       query: query as Record<string, QueryValue>,
       options
     });

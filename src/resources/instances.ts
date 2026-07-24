@@ -36,12 +36,12 @@ export class InstancesResource {
     body: CreateUnifiedInstanceRequest,
     options?: RequestOptions
   ): Promise<ApiResponse<UnifiedApiInstance & { generationTask?: GenerationTask }>> {
-    return this.http.request({ method: 'POST', path: '/api/unified/instance', body, options });
+    return this.http.request({ method: 'POST', path: '/unified/instance', body, options });
   }
 
   /** Fetch your Unified API instance. */
   get(options?: RequestOptions): Promise<ApiResponse<UnifiedApiInstance>> {
-    return this.http.request({ method: 'GET', path: '/api/unified/instance', options });
+    return this.http.request({ method: 'GET', path: '/unified/instance', options });
   }
 
   /** Generate additional entity contracts scoped to your instance. */
@@ -51,7 +51,7 @@ export class InstancesResource {
   ): Promise<ApiResponse<GenerationTask>> {
     return this.http.request({
       method: 'POST',
-      path: '/api/unified/instance/generate',
+      path: '/unified/instance/generate',
       body,
       options
     });

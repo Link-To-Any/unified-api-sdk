@@ -29,8 +29,8 @@ import type { RequestOptions, UniflowClientOptions } from './types.js';
  * 3. {@link records | `client.records`} — read and write unified records.
  *
  * Selecting `environment: 'dev'` targets the staging deployment at
- * `https://uniflow.staging.linktoany.com`; `'prod'` (the default) targets
- * `https://uniflow.linktoany.com`.
+ * `https://api.staging.linktoany.com`; `'prod'` (the default) targets
+ * `https://api.linktoany.com`.
  *
  * @example
  * ```ts

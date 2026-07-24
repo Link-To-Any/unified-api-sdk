@@ -24,7 +24,7 @@ import { UniflowClient } from 'unified-api-sdk';
 
 const client = new UniflowClient({
   apiKey: process.env.UNIFLOW_API_KEY!,
-  environment: 'dev', // 'dev' → uniflow.staging.linktoany.com, 'prod' → uniflow.linktoany.com
+  environment: 'dev', // 'dev' → api.staging.linktoany.com, 'prod' → api.linktoany.com
   organisationId: 'org-789'
 });
 
@@ -54,8 +54,8 @@ your app ──▶ UniflowClient
 
 | `environment` | Base URL |
 |---------------|----------|
-| `'dev'`       | `https://uniflow.staging.linktoany.com` |
-| `'prod'` (default) | `https://uniflow.linktoany.com` |
+| `'dev'`       | `https://api.staging.linktoany.com` |
+| `'prod'` (default) | `https://api.linktoany.com` |
 
 Override with `baseUrl` for local development:
 
@@ -65,11 +65,11 @@ new UniflowClient({ apiKey: '…', baseUrl: 'http://localhost:3000' });
 
 ### Authentication
 
-Every request carries your API key as `x-api-key` plus optional tenant-context headers:
+Every request carries your API key as `Authorization: Bearer <key>` plus optional tenant-context headers:
 
 | Client option | Header |
 |---------------|--------|
-| `apiKey` | `x-api-key` |
+| `apiKey` | `Authorization: Bearer <key>` |
 | `organisationId` | `x-posx-organisation-id` |
 | `userId` | `x-posx-user-id` |
 | `applicationId` | `x-posx-application-id` |

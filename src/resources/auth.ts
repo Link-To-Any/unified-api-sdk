@@ -67,7 +67,7 @@ export class AuthResource {
   ): Promise<ConnectAccountResponse> {
     return this.http.request({
       method: 'POST',
-      path: `/api/account/start/${encodeURIComponent(systemId)}/${encodeURIComponent(application)}`,
+      path: `/account/start/${encodeURIComponent(systemId)}/${encodeURIComponent(application)}`,
       body: payload,
       options
     });
@@ -99,7 +99,7 @@ export class AuthResource {
   refreshToken(accountId: ObjectId, options?: RequestOptions): Promise<ApiResponse<TokenInfo>> {
     return this.http.request({
       method: 'POST',
-      path: `/api/account/${encodeURIComponent(accountId)}/refresh-token`,
+      path: `/account/${encodeURIComponent(accountId)}/refresh-token`,
       options
     });
   }
@@ -115,7 +115,7 @@ export class AuthResource {
   ): Promise<ApiResponse<Record<string, unknown>>> {
     return this.http.request({
       method: 'GET',
-      path: `/api/account/${encodeURIComponent(accountId)}/token-status`,
+      path: `/account/${encodeURIComponent(accountId)}/token-status`,
       options
     });
   }

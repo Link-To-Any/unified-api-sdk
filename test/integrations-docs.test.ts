@@ -58,7 +58,7 @@ const FILTER_FROM: AvailableFilter = {
 function fullSystemRoutes() {
   return routedFetch([
     {
-      match: url => url.pathname === `/api/account/system/${SYSTEM_ID}`,
+      match: url => url.pathname === `/account/system/${SYSTEM_ID}`,
       body: {
         success: true,
         data: {
@@ -71,7 +71,7 @@ function fullSystemRoutes() {
       }
     },
     {
-      match: url => url.pathname === '/api/system-integration/sync-configs',
+      match: url => url.pathname === '/system-integration/sync-configs',
       body: {
         success: true,
         data: [
@@ -100,7 +100,7 @@ function fullSystemRoutes() {
       }
     },
     {
-      match: url => url.pathname === '/api/system-integration/configs',
+      match: url => url.pathname === '/system-integration/configs',
       body: {
         success: true,
         data: [
@@ -110,7 +110,7 @@ function fullSystemRoutes() {
       }
     },
     {
-      match: url => url.pathname === '/api/unified',
+      match: url => url.pathname === '/unified',
       body: {
         success: true,
         data: [
@@ -153,16 +153,16 @@ describe('integrations resource', () => {
 
     const seen = calls.map(c => `${c.method} ${new URL(c.url).pathname}`);
     assert.deepEqual(seen, [
-      'GET /api/account/system',
-      `GET /api/account/system/${SYSTEM_ID}`,
-      'GET /api/account/system/stats',
-      'GET /api/account/system/supported-auth-types',
-      'GET /api/account/system/auth-type/oauth2',
-      'GET /api/system-integration/sync-configs',
-      'GET /api/system-integration/configs',
-      `GET /api/system-integration/configs/${'9'.repeat(24)}`,
-      'GET /api/system-integration/schemas/templates',
-      'GET /api/system-integration/schemas/zod'
+      'GET /account/system',
+      `GET /account/system/${SYSTEM_ID}`,
+      'GET /account/system/stats',
+      'GET /account/system/supported-auth-types',
+      'GET /account/system/auth-type/oauth2',
+      'GET /system-integration/sync-configs',
+      'GET /system-integration/configs',
+      `GET /system-integration/configs/${'9'.repeat(24)}`,
+      'GET /system-integration/schemas/templates',
+      'GET /system-integration/schemas/zod'
     ]);
 
     assert.equal(new URL(calls[0]!.url).searchParams.get('status'), 'active');
@@ -186,7 +186,7 @@ describe('docs.describeIntegration', () => {
 
     // All four sources fetched, in parallel, scoped to the system
     assert.equal(calls.length, 4);
-    const contractsCall = calls.find(c => new URL(c.url).pathname === '/api/unified');
+    const contractsCall = calls.find(c => new URL(c.url).pathname === '/unified');
     assert.equal(new URL(contractsCall!.url).searchParams.get('systemIds'), SYSTEM_ID);
 
     assert.equal(docs.integration?.name, 'Shopify');
@@ -221,20 +221,20 @@ describe('docs.describeIntegration', () => {
   it('reports failing sources as warnings instead of failing the call', async () => {
     const { fetch } = routedFetch([
       {
-        match: url => url.pathname === `/api/account/system/${SYSTEM_ID}`,
+        match: url => url.pathname === `/account/system/${SYSTEM_ID}`,
         body: { success: true, data: { _id: SYSTEM_ID, name: 'Shopify' } }
       },
       {
-        match: url => url.pathname === '/api/system-integration/sync-configs',
+        match: url => url.pathname === '/system-integration/sync-configs',
         status: 500,
         body: { success: false, message: 'sync configs exploded' }
       },
       {
-        match: url => url.pathname === '/api/system-integration/configs',
+        match: url => url.pathname === '/system-integration/configs',
         body: { success: true, data: [{ _id: '4'.repeat(24), entityType: 'product', action: 'create' }] }
       },
       {
-        match: url => url.pathname === '/api/unified',
+        match: url => url.pathname === '/unified',
         body: { success: true, data: [] }
       }
     ]);
@@ -268,7 +268,7 @@ describe('docs helpers', () => {
   it('getEntityFilters queries scoped sync configs and dedupes', async () => {
     const { fetch, calls } = routedFetch([
       {
-        match: url => url.pathname === '/api/system-integration/sync-configs',
+        match: url => url.pathname === '/system-integration/sync-configs',
         body: {
           success: true,
           data: [
@@ -295,7 +295,7 @@ describe('docs helpers', () => {
   it('describeAllIntegrations documents every catalogued system', async () => {
     const { fetch, calls } = routedFetch([
       {
-        match: url => url.pathname === '/api/account/system',
+        match: url => url.pathname === '/account/system',
         body: {
           success: true,
           data: [
@@ -304,7 +304,7 @@ describe('docs helpers', () => {
           ]
         }
       },
-      { match: url => url.pathname.startsWith('/api/account/system/'), body: { success: true, data: { name: 'x' } } },
+      { match: url => url.pathname.startsWith('/account/system/'), body: { success: true, data: { name: 'x' } } },
       { match: () => true, body: { success: true, data: [] } }
     ]);
     const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch });

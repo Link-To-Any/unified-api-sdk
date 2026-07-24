@@ -1,6 +1,6 @@
 {
   "name": "unified-api-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Official Node.js / TypeScript SDK for the LinkToAny Uniflow Unified API — auth, account connection and unified entity execution.",
   "license": "MIT",
   "author": "LinkToAny",

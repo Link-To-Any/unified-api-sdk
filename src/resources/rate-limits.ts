@@ -5,6 +5,7 @@
  */
 
 import type { HttpClient } from '../http.js';
+import { normalizeListResponse } from '../normalize.js';
 import type {
   ApiResponse,
   ObjectId,
@@ -16,6 +17,9 @@ import type {
 /**
  * Manage per-organisation / per-account unified API rate limits.
  *
+ * NOTE: admin-plane routes — may not be exposed on the public API
+ * gateway (404), depending on deployment.
+ *
  * Accessed via {@link UniflowClient.rateLimits | `client.rateLimits`}.
  *
  * @category Resources
@@ -25,8 +29,13 @@ export class RateLimitsResource {
   constructor(private readonly http: HttpClient) {}
 
   /** List all rate-limit configs. */
-  list(options?: RequestOptions): Promise<ApiResponse<RateLimitConfig[]>> {
-    return this.http.request({ method: 'GET', path: '/api/unified/rate-limits', options });
+  async list(options?: RequestOptions): Promise<ApiResponse<RateLimitConfig[]>> {
+    const response = await this.http.request<ApiResponse<unknown>>({
+      method: 'GET',
+      path: '/unified/rate-limits',
+      options
+    });
+    return normalizeListResponse<RateLimitConfig>(response, 'configs', 'rateLimits');
   }
 
   /**
@@ -39,14 +48,14 @@ export class RateLimitsResource {
     body: UpsertRateLimitRequest,
     options?: RequestOptions
   ): Promise<ApiResponse<RateLimitConfig>> {
-    return this.http.request({ method: 'POST', path: '/api/unified/rate-limits', body, options });
+    return this.http.request({ method: 'POST', path: '/unified/rate-limits', body, options });
   }
 
   /** Delete a rate-limit config by id. */
   delete(configId: ObjectId, options?: RequestOptions): Promise<ApiResponse<unknown>> {
     return this.http.request({
       method: 'DELETE',
-      path: `/api/unified/rate-limits/${encodeURIComponent(configId)}`,
+      path: `/unified/rate-limits/${encodeURIComponent(configId)}`,
       options
     });
   }

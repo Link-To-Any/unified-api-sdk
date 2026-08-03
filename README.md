@@ -1,4 +1,4 @@
-# unified-api-sdk
+# @linktoany/sdk
 
 Official Node.js / TypeScript SDK for the **LinkToAny Uniflow Unified API** — one API for every integration. Connect a merchant's account once, then read and write normalized entities (`products`, `orders`, `customers`, …) through the same endpoints regardless of the platform behind them.
 
@@ -14,13 +14,13 @@ Official Node.js / TypeScript SDK for the **LinkToAny Uniflow Unified API** — 
 ## Installation
 
 ```bash
-npm install unified-api-sdk
+npm install @linktoany/sdk
 ```
 
 ## Quick start
 
 ```ts
-import { UniflowClient } from 'unified-api-sdk';
+import { UniflowClient } from '@linktoany/sdk';
 
 const client = new UniflowClient({
   apiKey: process.env.UNIFLOW_API_KEY!,
@@ -226,7 +226,7 @@ await client.rateLimits.upsert({ organisationId: 'org-789', requestsPerMinute: 1
 All failures throw typed subclasses of `UniflowError`:
 
 ```ts
-import { RateLimitError, ValidationError, NotFoundError } from 'unified-api-sdk';
+import { RateLimitError, ValidationError, NotFoundError } from '@linktoany/sdk';
 
 try {
   await client.records.create(accountId, 'products', payload);

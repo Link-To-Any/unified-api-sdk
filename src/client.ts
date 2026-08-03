@@ -34,7 +34,7 @@ import type { RequestOptions, UniflowClientOptions } from './types.js';
  *
  * @example
  * ```ts
- * import { UniflowClient } from 'unified-api-sdk';
+ * import { UniflowClient } from '@linktoany/sdk';
  *
  * const client = new UniflowClient({
  *   apiKey: process.env.UNIFLOW_API_KEY!,

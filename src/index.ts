@@ -1,5 +1,5 @@
 /**
- * @linktoany/sdk — official Node.js / TypeScript SDK for the
+ * @link-to-any/sdk — official Node.js / TypeScript SDK for the
  * LinkToAny Uniflow **Unified API**: one API for every integration.
  *
  * @packageDocumentation

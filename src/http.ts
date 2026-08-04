@@ -77,7 +77,7 @@ export class HttpClient {
       'content-type': 'application/json',
       accept: 'application/json',
       authorization: `Bearer ${options.apiKey}`,
-      'user-agent': 'linktoany-sdk-node/0.2.0',
+      'user-agent': 'linktoany-sdk-node/0.3.0',
       ...(options.organisationId ? { 'x-posx-organisation-id': options.organisationId } : {}),
       ...(options.userId ? { 'x-posx-user-id': options.userId } : {}),
       ...(options.applicationId ? { 'x-posx-application-id': options.applicationId } : {}),

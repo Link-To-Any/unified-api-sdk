@@ -1,5 +1,5 @@
 /**
- * Public request / response types for the Uniflow Unified API.
+ * Public request / response types for the LinkToAny Unified API.
  *
  * These mirror the server-side Zod validation schemas so the SDK
  * catches shape errors at compile time.
@@ -8,12 +8,12 @@
  */
 
 /** Target environment for the client. */
-export type UniflowEnvironment = 'dev' | 'prod';
+export type LinkToAnyEnvironment = 'dev' | 'prod';
 
 /** MongoDB ObjectId as a 24-char hex string. */
 export type ObjectId = string;
 
-/** Standard envelope returned by every Uniflow endpoint. */
+/** Standard envelope returned by every LinkToAny endpoint. */
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -25,9 +25,9 @@ export interface ApiResponse<T> {
 // ---------------------------------------------------------------------------
 
 /**
- * Options accepted by {@link UniflowClient}.
+ * Options accepted by {@link LinkToAny}.
  */
-export interface UniflowClientOptions {
+export interface LinkToAnyOptions {
   /**
    * API key sent as the `Authorization: Bearer <key>` header.
    * Use an admin key for write operations, public key for read-only.
@@ -41,7 +41,7 @@ export interface UniflowClientOptions {
    *
    * @defaultValue `'prod'`
    */
-  environment?: UniflowEnvironment;
+  environment?: LinkToAnyEnvironment;
   /**
    * Override the computed base URL entirely (e.g. `http://localhost:3000`
    * for local development). Takes precedence over `environment`.

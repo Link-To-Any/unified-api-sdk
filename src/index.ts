@@ -1,11 +1,11 @@
 /**
  * @link-to-any/sdk — official Node.js / TypeScript SDK for the
- * LinkToAny Uniflow **Unified API**: one API for every integration.
+ * LinkToAny **Unified API**: one API for every integration.
  *
  * @packageDocumentation
  */
 
-export { UniflowClient } from './client.js';
+export { LinkToAny } from './client.js';
 
 export { AuthResource } from './resources/auth.js';
 export { AccountsResource } from './resources/accounts.js';
@@ -19,7 +19,7 @@ export { DocsResource } from './resources/docs.js';
 export { RateLimitsResource } from './resources/rate-limits.js';
 
 export {
-  UniflowError,
+  LinkToAnyError,
   AuthenticationError,
   PermissionError,
   NotFoundError,
@@ -29,12 +29,12 @@ export {
   ConnectionError,
   TimeoutError
 } from './errors.js';
-export type { UniflowErrorBody } from './errors.js';
+export type { LinkToAnyErrorBody } from './errors.js';
 
 export type {
   // Client config
-  UniflowEnvironment,
-  UniflowClientOptions,
+  LinkToAnyEnvironment,
+  LinkToAnyOptions,
   RequestOptions,
   ApiResponse,
   ObjectId,

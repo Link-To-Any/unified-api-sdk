@@ -20,7 +20,7 @@ import type {
  * front door of the Unified API: once an account is connected, every
  * entity flows through the same unified endpoints.
  *
- * Accessed via {@link UniflowClient.auth | `client.auth`}.
+ * Accessed via {@link LinkToAny.auth | `client.auth`}.
  *
  * @category Resources
  */

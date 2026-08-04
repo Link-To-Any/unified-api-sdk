@@ -22,7 +22,7 @@ import type {
 /**
  * Manage unified entity contracts and AI contract generation.
  *
- * Accessed via {@link UniflowClient.entities | `client.entities`}.
+ * Accessed via {@link LinkToAny.entities | `client.entities`}.
  *
  * @category Resources
  */

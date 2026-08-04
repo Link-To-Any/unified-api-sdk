@@ -20,7 +20,7 @@ import type {
 /**
  * Manage connected accounts.
  *
- * Accessed via {@link UniflowClient.accounts | `client.accounts`}.
+ * Accessed via {@link LinkToAny.accounts | `client.accounts`}.
  *
  * @category Resources
  */
@@ -114,7 +114,7 @@ export class AccountsResource {
 
   /**
    * Store or replace the token bundle on an account — for platforms that
-   * obtain tokens out-of-band and hand them to Uniflow.
+   * obtain tokens out-of-band and hand them to LinkToAny.
    */
   updateTokens(
     accountId: ObjectId,

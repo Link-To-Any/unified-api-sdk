@@ -20,7 +20,7 @@ import type {
  * NOTE: admin-plane routes — may not be exposed on the public API
  * gateway (404), depending on deployment.
  *
- * Accessed via {@link UniflowClient.rateLimits | `client.rateLimits`}.
+ * Accessed via {@link LinkToAny.rateLimits | `client.rateLimits`}.
  *
  * @category Resources
  */

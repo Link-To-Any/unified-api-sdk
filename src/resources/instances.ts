@@ -18,7 +18,7 @@ import type {
 /**
  * Manage your Unified API instance.
  *
- * Accessed via {@link UniflowClient.instances | `client.instances`}.
+ * Accessed via {@link LinkToAny.instances | `client.instances`}.
  *
  * @category Resources
  */

@@ -1,5 +1,5 @@
 /**
- * The Uniflow Unified API client entry point.
+ * The LinkToAny Unified API client entry point.
  *
  * @module
  */
@@ -15,10 +15,10 @@ import { RateLimitsResource } from './resources/rate-limits.js';
 import { RecordsResource } from './resources/records.js';
 import { RequestsResource } from './resources/requests.js';
 import { TemplatesResource } from './resources/templates.js';
-import type { RequestOptions, UniflowClientOptions } from './types.js';
+import type { RequestOptions, LinkToAnyOptions } from './types.js';
 
 /**
- * Client for the LinkToAny Uniflow **Unified API** — one API for every
+ * Client for the LinkToAny **Unified API** — one API for every
  * integration. Connect an account once, then read and write normalized
  * entities (`products`, `orders`, `customers`, ...) through the same
  * endpoints regardless of the platform behind them.
@@ -34,10 +34,10 @@ import type { RequestOptions, UniflowClientOptions } from './types.js';
  *
  * @example
  * ```ts
- * import { UniflowClient } from '@link-to-any/sdk';
+ * import { LinkToAny } from '@link-to-any/sdk';
  *
- * const client = new UniflowClient({
- *   apiKey: process.env.UNIFLOW_API_KEY!,
+ * const client = new LinkToAny({
+ *   apiKey: process.env.LINKTOANY_API_KEY!,
  *   environment: 'dev',
  *   organisationId: 'org-789'
  * });
@@ -56,7 +56,7 @@ import type { RequestOptions, UniflowClientOptions } from './types.js';
  *
  * @category Client
  */
-export class UniflowClient {
+export class LinkToAny {
   /** @internal */
   private readonly http: HttpClient;
 
@@ -87,7 +87,7 @@ export class UniflowClient {
    * @param options - API key, environment and defaults.
    * @throws Error when `apiKey` is empty or `environment` is invalid.
    */
-  constructor(options: UniflowClientOptions) {
+  constructor(options: LinkToAnyOptions) {
     this.http = new HttpClient(options);
     this.auth = new AuthResource(this.http);
     this.accounts = new AccountsResource(this.http);

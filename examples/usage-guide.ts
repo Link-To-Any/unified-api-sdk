@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- *  Uniflow Unified API SDK — Developer Usage Guide
+ *  LinkToAny Unified API SDK — Developer Usage Guide
  * ============================================================================
  *
  * A runnable, end-to-end walkthrough of the SDK. Every section is a small,
@@ -22,32 +22,32 @@
  *   npx tsx examples/usage-guide.ts
  *
  *   # Live mode (against api.staging.linktoany.com)
- *   UNIFLOW_API_KEY=...  UNIFLOW_SYSTEM_ID=...  npx tsx examples/usage-guide.ts
+ *   LINKTOANY_API_KEY=...  LINKTOANY_SYSTEM_ID=...  npx tsx examples/usage-guide.ts
  *
  * Live-mode env vars:
- *   UNIFLOW_API_KEY     required — your API key
- *   UNIFLOW_ENV         'dev' (default) or 'prod'
- *   UNIFLOW_ORG_ID      optional — organisation / tenant id
- *   UNIFLOW_SYSTEM_ID   optional — integration id for discovery + connect
- *   UNIFLOW_ACCOUNT_ID  optional — connected account id for record calls
+ *   LINKTOANY_API_KEY     required — your API key
+ *   LINKTOANY_ENV         'dev' (default) or 'prod'
+ *   LINKTOANY_ORG_ID      optional — organisation / tenant id
+ *   LINKTOANY_SYSTEM_ID   optional — integration id for discovery + connect
+ *   LINKTOANY_ACCOUNT_ID  optional — connected account id for record calls
  * ============================================================================
  */
 
 import {
-  UniflowClient,
+  LinkToAny,
   NotFoundError,
   RateLimitError,
   ValidationError,
-  UniflowError
+  LinkToAnyError
 } from '../src/index.js';
 
 // ---------------------------------------------------------------------------
 // Setup — mock mode fakes the API so the guide runs anywhere
 // ---------------------------------------------------------------------------
 
-const LIVE = Boolean(process.env.UNIFLOW_API_KEY);
-const SYSTEM_ID = process.env.UNIFLOW_SYSTEM_ID ?? 'a1b2c3d4e5f6a1b2c3d4e5f6';
-const ACCOUNT_ID = process.env.UNIFLOW_ACCOUNT_ID ?? 'b2c3d4e5f6a1b2c3d4e5f6a1';
+const LIVE = Boolean(process.env.LINKTOANY_API_KEY);
+const SYSTEM_ID = process.env.LINKTOANY_SYSTEM_ID ?? 'a1b2c3d4e5f6a1b2c3d4e5f6';
+const ACCOUNT_ID = process.env.LINKTOANY_ACCOUNT_ID ?? 'b2c3d4e5f6a1b2c3d4e5f6a1';
 
 function heading(title: string): void {
   console.log(`\n${'='.repeat(74)}\n  ${title}\n${'='.repeat(74)}`);
@@ -63,17 +63,17 @@ function heading(title: string): void {
 // The API key is sent as `Authorization: Bearer <key>`. organisationId / userId /
 // applicationId become tenant-context headers on every request.
 
-const client = new UniflowClient({
-  apiKey: process.env.UNIFLOW_API_KEY ?? 'demo-key',
-  environment: (process.env.UNIFLOW_ENV as 'dev' | 'prod') ?? 'dev',
-  organisationId: process.env.UNIFLOW_ORG_ID,
+const client = new LinkToAny({
+  apiKey: process.env.LINKTOANY_API_KEY ?? 'demo-key',
+  environment: (process.env.LINKTOANY_ENV as 'dev' | 'prod') ?? 'dev',
+  organisationId: process.env.LINKTOANY_ORG_ID,
   timeoutMs: 30_000, // per-request timeout (default 30s)
   maxRetries: 2, // automatic retries on 429/5xx (default 2)
   ...(LIVE ? {} : { fetch: mockUnifiedApi() }) // mock mode only
 });
 
 async function main(): Promise<void> {
-  console.log(`Mode: ${LIVE ? 'LIVE' : 'MOCK (set UNIFLOW_API_KEY for live mode)'}`);
+  console.log(`Mode: ${LIVE ? 'LIVE' : 'MOCK (set LINKTOANY_API_KEY for live mode)'}`);
   console.log(`Base URL: ${client.baseUrl}`);
 
   heading('1. Health check');
@@ -223,7 +223,7 @@ async function main(): Promise<void> {
 
   // -------------------------------------------------------------------------
   heading('9. Error handling patterns');
-  // Every failure is a typed subclass of UniflowError. Retries for 429/5xx
+  // Every failure is a typed subclass of LinkToAnyError. Retries for 429/5xx
   // happen automatically first; you only catch what survived them.
 
   try {
@@ -235,7 +235,7 @@ async function main(): Promise<void> {
       console.log('Bad payload:', err.body);
     } else if (err instanceof RateLimitError) {
       console.log(`Rate limited — retry in ${err.retryAfterSeconds}s`);
-    } else if (err instanceof UniflowError) {
+    } else if (err instanceof LinkToAnyError) {
       console.log(`API error ${err.status}: ${err.message} (requestId=${err.requestId})`);
     } else {
       throw err; // programming error — do not swallow

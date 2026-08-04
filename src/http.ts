@@ -10,12 +10,12 @@ import {
   ConnectionError,
   TimeoutError,
   errorFromResponse,
-  type UniflowErrorBody
+  type LinkToAnyErrorBody
 } from './errors.js';
-import type { RequestOptions, UniflowClientOptions, UniflowEnvironment } from './types.js';
+import type { RequestOptions, LinkToAnyOptions, LinkToAnyEnvironment } from './types.js';
 
 /** Base URL per environment. */
-const BASE_URLS: Record<UniflowEnvironment, string> = {
+const BASE_URLS: Record<LinkToAnyEnvironment, string> = {
   dev: 'https://api.staging.linktoany.com',
   prod: 'https://api.linktoany.com'
 };
@@ -27,7 +27,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RETRIES = 2;
 
 /** Resolve the effective base URL from client options. @internal */
-export function resolveBaseUrl(options: Pick<UniflowClientOptions, 'baseUrl' | 'environment'>): string {
+export function resolveBaseUrl(options: Pick<LinkToAnyOptions, 'baseUrl' | 'environment'>): string {
   if (options.baseUrl) {
     return options.baseUrl.replace(/\/+$/, '');
   }
@@ -58,13 +58,13 @@ export class HttpClient {
   private readonly fetchImpl: typeof fetch;
   private requestCounter = 0;
 
-  constructor(options: UniflowClientOptions) {
+  constructor(options: LinkToAnyOptions) {
     if (!options.apiKey || !options.apiKey.trim()) {
-      throw new Error('UniflowClient: `apiKey` is required');
+      throw new Error('LinkToAny: `apiKey` is required');
     }
     if (options.environment && !(options.environment in BASE_URLS)) {
       throw new Error(
-        `UniflowClient: invalid environment '${options.environment}' — expected 'dev' or 'prod'`
+        `LinkToAny: invalid environment '${options.environment}' — expected 'dev' or 'prod'`
       );
     }
 
@@ -95,7 +95,7 @@ export class HttpClient {
     const url = this.buildUrl(req.path, req.query);
     const maxRetries = req.options?.maxRetries ?? this.maxRetries;
     const timeoutMs = req.options?.timeoutMs ?? this.timeoutMs;
-    const requestId = `uf_${Date.now().toString(36)}_${(++this.requestCounter).toString(36)}`;
+    const requestId = `lta_${Date.now().toString(36)}_${(++this.requestCounter).toString(36)}`;
 
     let lastError: Error | undefined;
 
@@ -120,7 +120,7 @@ export class HttpClient {
         return (await parseJson(response)) as T;
       }
 
-      const body = (await parseJson(response)) as UniflowErrorBody | undefined;
+      const body = (await parseJson(response)) as LinkToAnyErrorBody | undefined;
       const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
       const error = errorFromResponse(response.status, body, requestId, retryAfter);
 

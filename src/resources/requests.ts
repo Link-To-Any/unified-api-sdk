@@ -18,7 +18,7 @@ import type {
 /**
  * Inspect logged Unified API requests.
  *
- * Accessed via {@link UniflowClient.requests | `client.requests`}.
+ * Accessed via {@link LinkToAny.requests | `client.requests`}.
  *
  * @category Resources
  */

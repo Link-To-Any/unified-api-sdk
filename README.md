@@ -1,6 +1,6 @@
 # @link-to-any/sdk
 
-Official Node.js / TypeScript SDK for the **LinkToAny Uniflow Unified API** — one API for every integration. Connect a merchant's account once, then read and write normalized entities (`products`, `orders`, `customers`, …) through the same endpoints regardless of the platform behind them.
+Official Node.js / TypeScript SDK for the **LinkToAny Unified API** — one API for every integration. Connect a merchant's account once, then read and write normalized entities (`products`, `orders`, `customers`, …) through the same endpoints regardless of the platform behind them.
 
 - Zero runtime dependencies (built on native `fetch`, Node.js ≥ 18)
 - Unified-API-centric surface: `records`, `entities`, `integrations`, `docs`, `auth`, `accounts`
@@ -20,10 +20,10 @@ npm install @link-to-any/sdk
 ## Quick start
 
 ```ts
-import { UniflowClient } from '@link-to-any/sdk';
+import { LinkToAny } from '@link-to-any/sdk';
 
-const client = new UniflowClient({
-  apiKey: process.env.UNIFLOW_API_KEY!,
+const client = new LinkToAny({
+  apiKey: process.env.LINKTOANY_API_KEY!,
   environment: 'dev', // 'dev' → api.staging.linktoany.com, 'prod' → api.linktoany.com
   organisationId: 'org-789'
 });
@@ -41,7 +41,7 @@ const orders = await client.records.list(accountId, 'orders', { pageSize: 100 })
 ### The Unified API in one picture
 
 ```
-your app ──▶ UniflowClient
+your app ──▶ LinkToAny
               ├─ docs / integrations   what can I integrate? which entities? which filters?
               ├─ auth / accounts       connect merchant accounts (OAuth or direct)
               ├─ records               read/write unified records per accountId + entityType
@@ -60,7 +60,7 @@ your app ──▶ UniflowClient
 Override with `baseUrl` for local development:
 
 ```ts
-new UniflowClient({ apiKey: '…', baseUrl: 'http://localhost:3000' });
+new LinkToAny({ apiKey: '…', baseUrl: 'http://localhost:3000' });
 ```
 
 ### Authentication
@@ -223,7 +223,7 @@ await client.rateLimits.upsert({ organisationId: 'org-789', requestsPerMinute: 1
 
 ## Error handling
 
-All failures throw typed subclasses of `UniflowError`:
+All failures throw typed subclasses of `LinkToAnyError`:
 
 ```ts
 import { RateLimitError, ValidationError, NotFoundError } from '@link-to-any/sdk';
@@ -251,7 +251,7 @@ try {
 ## Timeouts, retries & cancellation
 
 ```ts
-const client = new UniflowClient({
+const client = new LinkToAny({
   apiKey: '…',
   timeoutMs: 60_000, // default 30 000
   maxRetries: 3      // default 2
@@ -275,7 +275,7 @@ A complete, sectioned walkthrough of every workflow lives at [examples/usage-gui
 npx tsx examples/usage-guide.ts
 
 # Live mode — against the staging Unified API
-UNIFLOW_API_KEY=... UNIFLOW_SYSTEM_ID=... npx tsx examples/usage-guide.ts
+LINKTOANY_API_KEY=... LINKTOANY_SYSTEM_ID=... npx tsx examples/usage-guide.ts
 ```
 
 ## API reference (auto-generated docs)

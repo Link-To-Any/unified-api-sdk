@@ -25,7 +25,7 @@ import type {
 /**
  * Discover integrations and the operations registered for them.
  *
- * Accessed via {@link UniflowClient.integrations | `client.integrations`}.
+ * Accessed via {@link LinkToAny.integrations | `client.integrations`}.
  *
  * @category Resources
  */

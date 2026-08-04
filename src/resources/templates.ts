@@ -18,7 +18,7 @@ import type {
 /**
  * Manage vertical templates.
  *
- * Accessed via {@link UniflowClient.templates | `client.templates`}.
+ * Accessed via {@link LinkToAny.templates | `client.templates`}.
  *
  * @category Resources
  */

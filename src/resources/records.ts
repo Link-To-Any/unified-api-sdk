@@ -19,7 +19,7 @@ import type {
 /**
  * Read and write unified records.
  *
- * Accessed via {@link UniflowClient.records | `client.records`}.
+ * Accessed via {@link LinkToAny.records | `client.records`}.
  *
  * @category Resources
  */

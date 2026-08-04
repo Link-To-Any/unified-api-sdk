@@ -5,7 +5,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { UniflowClient } from '../src/index.js';
+import { LinkToAny } from '../src/index.js';
 import type { AvailableFilter } from '../src/index.js';
 
 const SYSTEM_ID = 'f'.repeat(24);
@@ -138,7 +138,7 @@ describe('integrations resource', () => {
     const { fetch, calls } = routedFetch([
       { match: () => true, body: { success: true, data: [] } }
     ]);
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
 
     await client.integrations.list({ status: 'active' });
     await client.integrations.get(SYSTEM_ID);
@@ -180,7 +180,7 @@ describe('integrations resource', () => {
 describe('docs.describeIntegration', () => {
   it('assembles system, entities, filters and contracts', async () => {
     const { fetch, calls } = fullSystemRoutes();
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
 
     const docs = await client.docs.describeIntegration(SYSTEM_ID);
 
@@ -238,7 +238,7 @@ describe('docs.describeIntegration', () => {
         body: { success: true, data: [] }
       }
     ]);
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch, maxRetries: 0 });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch, maxRetries: 0 });
 
     const docs = await client.docs.describeIntegration(SYSTEM_ID);
 
@@ -259,7 +259,7 @@ describe('docs.describeIntegration', () => {
 describe('docs helpers', () => {
   it('listEntities returns the entity view only', async () => {
     const { fetch } = fullSystemRoutes();
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
 
     const entities = await client.docs.listEntities(SYSTEM_ID);
     assert.deepEqual(entities.map(e => e.entityType), ['customer', 'order', 'product']);
@@ -278,7 +278,7 @@ describe('docs helpers', () => {
         }
       }
     ]);
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
 
     const filters = await client.docs.getEntityFilters(SYSTEM_ID, 'order');
 
@@ -307,7 +307,7 @@ describe('docs helpers', () => {
       { match: url => url.pathname.startsWith('/account/system/'), body: { success: true, data: { name: 'x' } } },
       { match: () => true, body: { success: true, data: [] } }
     ]);
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev', fetch });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
 
     const all = await client.docs.describeAllIntegrations();
     assert.equal(all.length, 2);

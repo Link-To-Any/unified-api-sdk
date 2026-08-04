@@ -25,7 +25,7 @@ type WarningSource = IntegrationDocumentation['warnings'][number]['source'];
 /**
  * Aggregated, DB-backed documentation for integrations.
  *
- * Accessed via {@link UniflowClient.docs | `client.docs`}.
+ * Accessed via {@link LinkToAny.docs | `client.docs`}.
  *
  * @category Resources
  */

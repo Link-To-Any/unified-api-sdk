@@ -1,5 +1,5 @@
 /**
- * Unit tests for the Uniflow SDK.
+ * Unit tests for the LinkToAny SDK.
  *
  * Runs on the built-in Node.js test runner via tsx:
  *   npm test
@@ -10,8 +10,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  UniflowClient,
-  UniflowError,
+  LinkToAny,
+  LinkToAnyError,
   AuthenticationError,
   PermissionError,
   NotFoundError,
@@ -65,10 +65,10 @@ function mockFetch(responses: MockResponse[]): { fetch: typeof fetch; calls: Rec
 
 function okClient(
   responses: MockResponse[] = [{ status: 200, body: { success: true, data: {} } }],
-  options: Partial<ConstructorParameters<typeof UniflowClient>[0]> = {}
-): { client: UniflowClient; calls: RecordedCall[] } {
+  options: Partial<ConstructorParameters<typeof LinkToAny>[0]> = {}
+): { client: LinkToAny; calls: RecordedCall[] } {
   const { fetch, calls } = mockFetch(responses);
-  const client = new UniflowClient({ apiKey: 'test-key', environment: 'dev', fetch, ...options });
+  const client = new LinkToAny({ apiKey: 'test-key', environment: 'dev', fetch, ...options });
   return { client, calls };
 }
 
@@ -76,24 +76,24 @@ function okClient(
 // Construction & base URL resolution
 // ---------------------------------------------------------------------------
 
-describe('UniflowClient construction', () => {
+describe('LinkToAny construction', () => {
   it("resolves 'dev' to the staging base URL", () => {
-    const client = new UniflowClient({ apiKey: 'k', environment: 'dev' });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev' });
     assert.equal(client.baseUrl, 'https://api.staging.linktoany.com');
   });
 
   it("resolves 'prod' to the production base URL", () => {
-    const client = new UniflowClient({ apiKey: 'k', environment: 'prod' });
+    const client = new LinkToAny({ apiKey: 'k', environment: 'prod' });
     assert.equal(client.baseUrl, 'https://api.linktoany.com');
   });
 
   it('defaults to prod when environment is omitted', () => {
-    const client = new UniflowClient({ apiKey: 'k' });
+    const client = new LinkToAny({ apiKey: 'k' });
     assert.equal(client.baseUrl, 'https://api.linktoany.com');
   });
 
   it('lets baseUrl override the environment and strips trailing slashes', () => {
-    const client = new UniflowClient({
+    const client = new LinkToAny({
       apiKey: 'k',
       environment: 'dev',
       baseUrl: 'http://localhost:3000//'
@@ -102,12 +102,12 @@ describe('UniflowClient construction', () => {
   });
 
   it('rejects an empty api key', () => {
-    assert.throws(() => new UniflowClient({ apiKey: '  ' }), /apiKey.*required/);
+    assert.throws(() => new LinkToAny({ apiKey: '  ' }), /apiKey.*required/);
   });
 
   it('rejects an unknown environment', () => {
     assert.throws(
-      () => new UniflowClient({ apiKey: 'k', environment: 'staging' as never }),
+      () => new LinkToAny({ apiKey: 'k', environment: 'staging' as never }),
       /invalid environment 'staging'/
     );
   });
@@ -194,7 +194,7 @@ describe('query serialization', () => {
 // ---------------------------------------------------------------------------
 
 describe('error mapping', () => {
-  const cases: Array<[number, new (...args: never[]) => UniflowError]> = [
+  const cases: Array<[number, new (...args: never[]) => LinkToAnyError]> = [
     [401, AuthenticationError],
     [403, PermissionError],
     [404, NotFoundError],
@@ -209,7 +209,7 @@ describe('error mapping', () => {
         [{ status, body: { success: false, message: 'boom', code: 'E_TEST' } }],
         { maxRetries: 0 }
       );
-      await assert.rejects(client.accounts.get(OID_A), (err: UniflowError) => {
+      await assert.rejects(client.accounts.get(OID_A), (err: LinkToAnyError) => {
         assert.ok(err instanceof errorClass, `expected ${errorClass.name}, got ${err.constructor.name}`);
         assert.equal(err.status, status);
         assert.equal(err.code, 'E_TEST');
@@ -224,7 +224,7 @@ describe('error mapping', () => {
     const { fetch } = mockFetch([]);
     const badFetch = (async () =>
       new Response('plain text error', { status: 500 })) as typeof fetch;
-    const client = new UniflowClient({ apiKey: 'k', fetch: badFetch, maxRetries: 0 });
+    const client = new LinkToAny({ apiKey: 'k', fetch: badFetch, maxRetries: 0 });
 
     await assert.rejects(client.accounts.get(OID_A), (err: ServerError) => {
       assert.ok(err instanceof ServerError);
@@ -294,7 +294,7 @@ describe('timeout and cancellation', () => {
         );
       })) as typeof fetch;
 
-    const client = new UniflowClient({
+    const client = new LinkToAny({
       apiKey: 'k',
       fetch: neverResolves,
       timeoutMs: 30,
@@ -311,7 +311,7 @@ describe('timeout and cancellation', () => {
         );
       })) as typeof fetch;
 
-    const client = new UniflowClient({ apiKey: 'k', fetch: neverResolves, maxRetries: 0 });
+    const client = new LinkToAny({ apiKey: 'k', fetch: neverResolves, maxRetries: 0 });
     const ac = new AbortController();
     const pending = assert.rejects(
       client.health({ signal: ac.signal }),
@@ -329,7 +329,7 @@ describe('timeout and cancellation', () => {
     const failing = (async () => {
       throw new TypeError('fetch failed');
     }) as typeof fetch;
-    const client = new UniflowClient({ apiKey: 'k', fetch: failing, maxRetries: 0 });
+    const client = new LinkToAny({ apiKey: 'k', fetch: failing, maxRetries: 0 });
     await assert.rejects(client.health(), (err: ConnectionError) => {
       assert.ok(err instanceof ConnectionError);
       assert.match(err.message, /fetch failed/);

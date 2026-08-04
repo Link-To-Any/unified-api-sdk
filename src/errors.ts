@@ -1,15 +1,15 @@
 /**
- * Error hierarchy for the Uniflow SDK.
+ * Error hierarchy for the LinkToAny SDK.
  *
  * Every non-2xx API response is converted into a typed subclass of
- * {@link UniflowError} so callers can branch on `instanceof` instead of
+ * {@link LinkToAnyError} so callers can branch on `instanceof` instead of
  * inspecting raw status codes.
  *
  * @module
  */
 
-/** Shape of the error payload returned by the Uniflow API. */
-export interface UniflowErrorBody {
+/** Shape of the error payload returned by the LinkToAny API. */
+export interface LinkToAnyErrorBody {
   success?: boolean;
   message?: string;
   code?: string;
@@ -22,13 +22,13 @@ export interface UniflowErrorBody {
  *
  * @category Errors
  */
-export class UniflowError extends Error {
+export class LinkToAnyError extends Error {
   /** HTTP status code of the failed response, if the request reached the server. */
   readonly status?: number;
   /** Machine-readable error code returned by the API (e.g. `AUTH_FAILED`). */
   readonly code?: string;
   /** Raw response body as parsed JSON, useful for debugging. */
-  readonly body?: UniflowErrorBody;
+  readonly body?: LinkToAnyErrorBody;
   /** Unique id of the HTTP request attempt, for correlating with logs. */
   readonly requestId?: string;
 
@@ -37,7 +37,7 @@ export class UniflowError extends Error {
     options: {
       status?: number;
       code?: string;
-      body?: UniflowErrorBody;
+      body?: LinkToAnyErrorBody;
       requestId?: string;
       cause?: unknown;
     } = {}
@@ -56,21 +56,21 @@ export class UniflowError extends Error {
  *
  * @category Errors
  */
-export class AuthenticationError extends UniflowError {}
+export class AuthenticationError extends LinkToAnyError {}
 
 /**
  * Thrown when the API key lacks permission for the operation (HTTP 403).
  *
  * @category Errors
  */
-export class PermissionError extends UniflowError {}
+export class PermissionError extends LinkToAnyError {}
 
 /**
  * Thrown when the requested resource does not exist (HTTP 404).
  *
  * @category Errors
  */
-export class NotFoundError extends UniflowError {}
+export class NotFoundError extends LinkToAnyError {}
 
 /**
  * Thrown when the request payload fails server-side validation
@@ -78,7 +78,7 @@ export class NotFoundError extends UniflowError {}
  *
  * @category Errors
  */
-export class ValidationError extends UniflowError {}
+export class ValidationError extends LinkToAnyError {}
 
 /**
  * Thrown when the organisation or account exceeds its unified API rate
@@ -87,13 +87,13 @@ export class ValidationError extends UniflowError {}
  *
  * @category Errors
  */
-export class RateLimitError extends UniflowError {
+export class RateLimitError extends LinkToAnyError {
   /** Seconds to wait before retrying, from the `Retry-After` header. */
   readonly retryAfterSeconds?: number;
 
   constructor(
     message: string,
-    options: ConstructorParameters<typeof UniflowError>[1] & { retryAfterSeconds?: number } = {}
+    options: ConstructorParameters<typeof LinkToAnyError>[1] & { retryAfterSeconds?: number } = {}
   ) {
     super(message, options);
     this.retryAfterSeconds = options.retryAfterSeconds;
@@ -105,7 +105,7 @@ export class RateLimitError extends UniflowError {
  *
  * @category Errors
  */
-export class ServerError extends UniflowError {}
+export class ServerError extends LinkToAnyError {}
 
 /**
  * Thrown when the request never completed — network failure, DNS error
@@ -113,10 +113,10 @@ export class ServerError extends UniflowError {}
  *
  * @category Errors
  */
-export class ConnectionError extends UniflowError {}
+export class ConnectionError extends LinkToAnyError {}
 
 /**
- * Thrown when a request exceeded {@link UniflowClientOptions.timeoutMs}.
+ * Thrown when a request exceeded {@link LinkToAnyOptions.timeoutMs}.
  *
  * @category Errors
  */
@@ -129,10 +129,10 @@ export class TimeoutError extends ConnectionError {}
  */
 export function errorFromResponse(
   status: number,
-  body: UniflowErrorBody | undefined,
+  body: LinkToAnyErrorBody | undefined,
   requestId: string,
   retryAfterSeconds?: number
-): UniflowError {
+): LinkToAnyError {
   const message =
     (typeof body?.message === 'string' && body.message) ||
     (typeof body?.error === 'string' && body.error) ||
@@ -145,5 +145,5 @@ export function errorFromResponse(
   if (status === 400 || status === 422) return new ValidationError(message, base);
   if (status === 429) return new RateLimitError(message, { ...base, retryAfterSeconds });
   if (status >= 500) return new ServerError(message, base);
-  return new UniflowError(message, base);
+  return new LinkToAnyError(message, base);
 }

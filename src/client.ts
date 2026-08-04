@@ -34,7 +34,7 @@ import type { RequestOptions, LinkToAnyOptions } from './types.js';
  *
  * @example
  * ```ts
- * import { LinkToAny } from '@link-to-any/sdk';
+ * import { LinkToAny } from '@linktoany/sdk';
  *
  * const client = new LinkToAny({
  *   apiKey: process.env.LINKTOANY_API_KEY!,

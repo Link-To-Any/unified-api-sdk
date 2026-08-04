@@ -1,4 +1,4 @@
-# @link-to-any/sdk
+# @linktoany/sdk
 
 Official Node.js / TypeScript SDK for the **LinkToAny Unified API** — one API for every integration. Connect a merchant's account once, then read and write normalized entities (`products`, `orders`, `customers`, …) through the same endpoints regardless of the platform behind them.
 
@@ -14,13 +14,13 @@ Official Node.js / TypeScript SDK for the **LinkToAny Unified API** — one API 
 ## Installation
 
 ```bash
-npm install @link-to-any/sdk
+npm install @linktoany/sdk
 ```
 
 ## Quick start
 
 ```ts
-import { LinkToAny } from '@link-to-any/sdk';
+import { LinkToAny } from '@linktoany/sdk';
 
 const client = new LinkToAny({
   apiKey: process.env.LINKTOANY_API_KEY!,
@@ -226,7 +226,7 @@ await client.rateLimits.upsert({ organisationId: 'org-789', requestsPerMinute: 1
 All failures throw typed subclasses of `LinkToAnyError`:
 
 ```ts
-import { RateLimitError, ValidationError, NotFoundError } from '@link-to-any/sdk';
+import { RateLimitError, ValidationError, NotFoundError } from '@linktoany/sdk';
 
 try {
   await client.records.create(accountId, 'products', payload);

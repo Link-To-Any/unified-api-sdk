@@ -24,8 +24,7 @@ import { LinkToAny } from '@linktoany/sdk';
 
 const client = new LinkToAny({
   apiKey: process.env.LINKTOANY_API_KEY!,
-  environment: 'dev', // 'dev' → api.staging.linktoany.com, 'prod' → api.linktoany.com
-  organisationId: 'org-789'
+  environment: 'dev' // 'dev' → api.staging.linktoany.com, 'prod' → api.linktoany.com
 });
 
 // 1. Connect a merchant's account to an integration
@@ -46,7 +45,6 @@ your app ──▶ LinkToAny
               ├─ auth / accounts       connect merchant accounts (OAuth or direct)
               ├─ records               read/write unified records per accountId + entityType
               ├─ entities              the contracts defining each unified entity
-              ├─ templates / instances bootstrap a Unified API per vertical
               └─ requests / rateLimits observability & guardrails
 ```
 
@@ -65,16 +63,13 @@ new LinkToAny({ apiKey: '…', baseUrl: 'http://localhost:3000' });
 
 ### Authentication
 
-Every request carries your API key as `Authorization: Bearer <key>` plus optional tenant-context headers:
+Every request carries your API key as `Authorization: Bearer <key>`:
 
 | Client option | Header |
 |---------------|--------|
 | `apiKey` | `Authorization: Bearer <key>` |
-| `organisationId` | `x-posx-organisation-id` |
-| `userId` | `x-posx-user-id` |
-| `applicationId` | `x-posx-application-id` |
 
-Use an **admin** key for write operations, a **public** key for read-only access.
+Use an **api** key for write operations and read-only access.
 
 ## Discover integrations (`client.docs`, `client.integrations`)
 
@@ -168,47 +163,6 @@ await client.records.create(accountId, 'products', {
   name: 'Espresso Beans 1kg',
   sku: 'ESP-1KG',
   price: 18.5
-});
-```
-
-## Unified entity contracts (`client.entities`)
-
-A contract = an entity's unified Zod schema + mappings onto integration operations:
-
-```ts
-const contracts = await client.entities.list({ onlyEnabled: true });
-
-await client.entities.upsert('products', {
-  unifiedZodSchema: '…',
-  readMappings: [{ key: 'shopify', systemId, sourceEntityType: 'product' }]
-});
-```
-
-### Generate contracts with AI
-
-```ts
-// Auto-discovery: AI groups integration operations into unified entities
-const { data: task } = await client.entities.generate({
-  systemIds: [systemA, systemB],
-  syncRequestConfigIds: [readOp1, readOp2],
-  pushRequestConfigIds: [writeOp1]
-});
-
-const finished = await client.entities.waitForGeneration(task._id, {
-  intervalMs: 5_000,
-  timeoutMs: 600_000
-});
-```
-
-## Templates & instances
-
-```ts
-const template = await client.templates.get('retail');   // pre-built vertical
-
-const instance = await client.instances.create({         // your Unified API
-  vertical: 'retail',
-  systemIds: [shopifyId, quickbooksId],
-  entities: [{ entityType: 'products', systems: [{ systemId: shopifyId, syncRequestConfigId }] }]
 });
 ```
 

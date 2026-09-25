@@ -137,22 +137,60 @@ Manage connected accounts with `client.accounts` — `create`, `list`, `get`, `u
 ## Read unified records (`client.records`)
 
 ```ts
-// One page
-const page = await client.records.list(accountId, 'orders', {
+// One page, with a time filter. Each filter is its own query param and any
+// combination of createdAfter / createdBefore / updatedAfter / updatedBefore is allowed.
+const page = await client.records.list(accountId, 'order', {
   pageSize: 100,
-  filters: { status: 'paid' } // keys from docs.getEntityFilters(...)
+  updatedAfter: '2026-01-01T00:00:00Z'
 });
 console.log(page.data, page.pagination?.cursor);
 
+// filtersApplied says what the platform did with each filter:
+//   [{ name: 'updatedAfter', mode: 'native' }]       — applied by the platform
+//   [{ name: 'createdAfter', mode: 'unavailable' }]  — this system can't; no effect, never emulated
+// Which filters each system supports is listed per entity in the API reference,
+// or read it at runtime with client.docs.getEntityFilters(systemId, 'order').
+console.log(page.filtersApplied, page.syncSupport);
+
 // All pages, cursor handled for you
-for await (const order of client.records.iterate(accountId, 'orders')) {
+for await (const order of client.records.iterate(accountId, 'order')) {
   process(order);
 }
 
 // Typed
-interface Order { id: string; status: string; total: number }
-const { data } = await client.records.list<Order>(accountId, 'orders');
+interface Order { externalId: string; state: string; total: number }
+const { data } = await client.records.list<Order>(accountId, 'order');
 ```
+
+Values are RFC 3339; the SDK never needs a platform-specific format — LinkToAny converts to
+epoch milliseconds for Clover, ISO for Square, and so on.
+
+### Incremental reads (`since` / `syncToken`)
+
+Where `syncSupport` is `'native'`, the final page of a read (`hasMore: false`) carries
+`pagination.syncToken`. Store it and pass it back as `since` to receive only what changed:
+
+```ts
+let syncToken = await store.get(accountId, 'order'); // string | undefined on first run
+
+for await (const page of client.records.iteratePages(accountId, 'order', { since: syncToken, pageSize: 200 })) {
+  await upsert(page.data);                           // idempotent on externalId
+  syncToken = page.pagination?.syncToken ?? syncToken;
+}
+
+await store.set(accountId, 'order', syncToken);
+```
+
+- `since` also accepts a raw RFC 3339 instant (`'2026-03-01T00:00:00Z'`). Anything else is
+  `422 INVALID_SINCE_VALUE`.
+- The checkpoint advances to the newest record seen. A replay that finds nothing returns one empty
+  page with the **same** token — keep storing whatever comes back.
+- Delivery is at-least-once: the record on the boundary may appear again. Upsert, don't insert.
+- A token pins the filters of the read that produced it; different filters with the same token are
+  `409 UNIFIED_CURSOR_FILTER_MISMATCH`, another account/entity is `409 UNIFIED_SYNC_TOKEN_MISMATCH`.
+  `updatedAfter` sent alongside `since` is fine — the later bound wins.
+- On systems where `syncSupport` is `'none'`, `since` is `422 INCREMENTAL_SYNC_NOT_SUPPORTED` rather
+  than a silent full read. Deletes are not reported yet.
 
 ## Write unified records (`client.records`)
 
@@ -198,9 +236,22 @@ try {
 | `PermissionError` | 403 |
 | `NotFoundError` | 404 |
 | `ValidationError` | 400 / 422 |
+| `ConflictError` | 409 (cursor / sync token issued for a different read) |
 | `RateLimitError` | 429 (after retries exhausted) |
 | `ServerError` | 5xx |
 | `TimeoutError` / `ConnectionError` | request never completed |
+
+Every error carries `code` (typed for unified reads as `UnifiedReadErrorCode`), `body` and
+`requestId`. Codes a read can fail with:
+
+| `code` | Error | Meaning |
+|--------|-------|---------|
+| `UNKNOWN_FILTER` | `ValidationError` | Filter name outside `createdAfter` / `createdBefore` / `updatedAfter` / `updatedBefore` |
+| `INVALID_FILTER_VALUE` | `ValidationError` | Filter value is not an RFC 3339 date-time |
+| `INVALID_SINCE_VALUE` | `ValidationError` | `since` is neither a date-time nor a `syncToken` (e.g. a page `cursor`) |
+| `INCREMENTAL_SYNC_NOT_SUPPORTED` | `ValidationError` | `since` sent where `syncSupport` is `'none'` |
+| `UNIFIED_SYNC_TOKEN_MISMATCH` | `ConflictError` | Token from another account, entity or mapping |
+| `UNIFIED_CURSOR_FILTER_MISMATCH` | `ConflictError` | Cursor/token pins different filters than those sent |
 
 ## Timeouts, retries & cancellation
 

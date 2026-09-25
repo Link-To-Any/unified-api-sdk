@@ -36,15 +36,19 @@ export class RecordsResource {
    * @typeParam T - Shape of a unified record (defaults to a generic object).
    * @param accountId - Connected account to read from.
    * @param entityType - Unified entity type (e.g. `products`, `orders`).
-   * @param query - Pagination cursor, page size, watermark and filters.
+   * @param query - Pagination cursor, page size, `since` and time filters
+   *   (`createdAfter`, `createdBefore`, `updatedAfter`, `updatedBefore`).
+   *   Each filter is its own query parameter and any combination is allowed.
    *
    * @example
    * ```ts
    * const page = await client.records.list(accountId, 'products', {
    *   pageSize: 100,
-   *   filters: { updatedAfter: '2026-01-01T00:00:00Z' }
+   *   updatedAfter: '2026-01-01T00:00:00Z'
    * });
-   * console.log(page.data.length, page.pagination?.cursor);
+   * // filtersApplied tells you whether the platform honoured each filter
+   * // ('native') or could not ('unavailable' — no effect, never emulated).
+   * console.log(page.data.length, page.filtersApplied, page.pagination?.cursor);
    * ```
    */
   list<T = Record<string, unknown>>(
@@ -95,6 +99,46 @@ export class RecordsResource {
       for (const record of page.data) {
         yield record;
       }
+      const next = page.pagination?.cursor ?? undefined;
+      const hasMore = page.pagination?.hasMore ?? Boolean(next);
+      cursor = hasMore && next && next !== cursor ? next : undefined;
+    } while (cursor);
+  }
+
+  /**
+   * Iterate page by page instead of record by record. The last page yielded
+   * carries `pagination.syncToken` (for systems with native incremental
+   * support) — persist it and pass it as `since` next time to read only what
+   * changed. A replay that finds nothing yields one empty page whose token
+   * equals the one you sent; store it anyway. Check `syncSupport` on the
+   * first page before depending on incremental reads — `since` is rejected
+   * with `422 INCREMENTAL_SYNC_NOT_SUPPORTED` where it is `'none'`.
+   *
+   * @example
+   * ```ts
+   * let syncToken = await store.get(accountId, 'invoice'); // string | undefined
+   * for await (const page of client.records.iteratePages(accountId, 'invoice', { since: syncToken, pageSize: 200 })) {
+   *   await upsert(page.data);                       // idempotent on externalId
+   *   syncToken = page.pagination?.syncToken ?? syncToken;
+   * }
+   * await store.set(accountId, 'invoice', syncToken);
+   * ```
+   */
+  async *iteratePages<T = Record<string, unknown>>(
+    accountId: ObjectId,
+    entityType: string,
+    query: Omit<GetUnifiedRecordsQuery, 'cursor'> = {},
+    options?: RequestOptions
+  ): AsyncGenerator<UnifiedRecordsPage<T>, void, undefined> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.list<T>(
+        accountId,
+        entityType,
+        { ...query, ...(cursor ? { cursor } : {}) },
+        options
+      );
+      yield page;
       const next = page.pagination?.cursor ?? undefined;
       const hasMore = page.pagination?.hasMore ?? Boolean(next);
       cursor = hasMore && next && next !== cursor ? next : undefined;

@@ -16,6 +16,7 @@ import {
   PermissionError,
   NotFoundError,
   ValidationError,
+  ConflictError,
   RateLimitError,
   ServerError,
   ConnectionError,
@@ -155,22 +156,41 @@ describe('request headers', () => {
 });
 
 describe('query serialization', () => {
-  it('serializes scalars, nested filters and skips undefined', async () => {
+  it('serializes scalars, the legacy filters object and skips undefined', async () => {
     const { client, calls } = okClient([
       { status: 200, body: { success: true, data: [], pagination: {} } }
     ]);
     await client.records.list(OID_A, 'products', {
       pageSize: 50,
       watermark: undefined,
-      filters: { status: 'active', vendor: 'acme' }
+      filters: { updatedAfter: '2026-01-01T00:00:00Z', createdBefore: '2026-02-01T00:00:00Z' }
     });
 
     const url = new URL(calls[0]!.url);
     assert.equal(url.pathname, `/unified/${OID_A}/products`);
     assert.equal(url.searchParams.get('pageSize'), '50');
-    assert.equal(url.searchParams.get('filters[status]'), 'active');
-    assert.equal(url.searchParams.get('filters[vendor]'), 'acme');
+    assert.equal(url.searchParams.get('filters[updatedAfter]'), '2026-01-01T00:00:00Z');
+    assert.equal(url.searchParams.get('filters[createdBefore]'), '2026-02-01T00:00:00Z');
     assert.ok(!url.searchParams.has('watermark'));
+  });
+
+  it('sends each time filter and since as its own query param', async () => {
+    const { client, calls } = okClient([
+      { status: 200, body: { success: true, data: [], pagination: {} } }
+    ]);
+    await client.records.list(OID_A, 'order', {
+      pageSize: 10,
+      since: 'eyJ2IjoyfQ',
+      updatedAfter: '2026-01-01T00:00:00Z',
+      createdBefore: '2026-02-01T00:00:00Z'
+    });
+
+    const url = new URL(calls[0]!.url);
+    assert.equal(url.searchParams.get('since'), 'eyJ2IjoyfQ');
+    assert.equal(url.searchParams.get('updatedAfter'), '2026-01-01T00:00:00Z');
+    assert.equal(url.searchParams.get('createdBefore'), '2026-02-01T00:00:00Z');
+    assert.ok(!url.searchParams.has('filters[updatedAfter]'));
+    assert.ok(!url.searchParams.has('createdAfter'));
   });
 
   it('serializes array params as comma-separated values', async () => {
@@ -198,6 +218,7 @@ describe('error mapping', () => {
     [401, AuthenticationError],
     [403, PermissionError],
     [404, NotFoundError],
+    [409, ConflictError],
     [400, ValidationError],
     [422, ValidationError],
     [500, ServerError]
@@ -480,6 +501,48 @@ describe('unified records', () => {
     assert.deepEqual(seen, [1, 2, 3]);
     assert.equal(calls.length, 2);
     assert.equal(new URL(calls[1]!.url).searchParams.get('cursor'), 'c2');
+  });
+
+  it('iteratePages yields whole pages and surfaces the final syncToken', async () => {
+    const { client, calls } = okClient([
+      {
+        status: 200,
+        body: { success: true, data: [{ n: 1 }], syncSupport: 'native', pagination: { cursor: 'c2', hasMore: true, syncToken: null } }
+      },
+      {
+        status: 200,
+        body: { success: true, data: [{ n: 2 }], syncSupport: 'native', pagination: { cursor: null, hasMore: false, syncToken: 'tok-1' } }
+      }
+    ]);
+
+    let syncToken: string | null | undefined;
+    const sizes: number[] = [];
+    for await (const page of client.records.iteratePages<{ n: number }>(OID_A, 'order', { since: 'tok-0' })) {
+      sizes.push(page.data.length);
+      syncToken = page.pagination?.syncToken ?? syncToken;
+    }
+
+    assert.deepEqual(sizes, [1, 1]);
+    assert.equal(syncToken, 'tok-1');
+    assert.equal(calls.length, 2);
+    assert.equal(new URL(calls[0]!.url).searchParams.get('since'), 'tok-0');
+    assert.equal(new URL(calls[1]!.url).searchParams.get('cursor'), 'c2');
+  });
+
+  it('an empty incremental replay still yields the (unchanged) syncToken', async () => {
+    const { client } = okClient([
+      {
+        status: 200,
+        body: { success: true, data: [], filtersApplied: [], syncSupport: 'native', pagination: { cursor: null, hasMore: false, syncToken: 'tok-0' } }
+      }
+    ]);
+
+    const pages = [];
+    for await (const page of client.records.iteratePages(OID_A, 'order', { since: 'tok-0' })) pages.push(page);
+
+    assert.equal(pages.length, 1);
+    assert.deepEqual(pages[0]!.data, []);
+    assert.equal(pages[0]!.pagination?.syncToken, 'tok-0');
   });
 
   it('iterateRecords stops when the cursor repeats (no infinite loop)', async () => {

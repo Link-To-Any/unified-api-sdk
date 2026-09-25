@@ -24,6 +24,7 @@ export {
   PermissionError,
   NotFoundError,
   ValidationError,
+  ConflictError,
   RateLimitError,
   ServerError,
   ConnectionError,
@@ -49,6 +50,9 @@ export type {
   ListAccountsQuery,
   // Unified records
   GetUnifiedRecordsQuery,
+  UnifiedTimeFilters,
+  AppliedFilter,
+  UnifiedReadErrorCode,
   UnifiedPagination,
   UnifiedRecordsPage,
   PostUnifiedRecordQuery,

@@ -193,6 +193,43 @@ export interface ListAccountsQuery {
 // Unified records (execution API)
 // ---------------------------------------------------------------------------
 
+/** The unified time filters. Values are RFC 3339 date-times. */
+export interface UnifiedTimeFilters {
+  /** Records created at or after this instant. */
+  createdAfter?: string;
+  /** Records created before this instant. */
+  createdBefore?: string;
+  /** Records updated at or after this instant. */
+  updatedAfter?: string;
+  /** Records updated before this instant. */
+  updatedBefore?: string;
+}
+
+/**
+ * Machine-readable `code` values a unified read can fail with. All are
+ * `ValidationError` (422) except the two mismatches, which are `ConflictError` (409).
+ */
+export type UnifiedReadErrorCode =
+  /** A filter name outside the unified vocabulary (see {@link UnifiedTimeFilters}). */
+  | 'UNKNOWN_FILTER'
+  /** A filter value that is not an RFC 3339 date-time. */
+  | 'INVALID_FILTER_VALUE'
+  /** `since` is neither an RFC 3339 date-time nor a `pagination.syncToken` (e.g. a page `cursor`). */
+  | 'INVALID_SINCE_VALUE'
+  /** `since` was sent to an account whose system reports `syncSupport: 'none'`. */
+  | 'INCREMENTAL_SYNC_NOT_SUPPORTED'
+  /** The sync token was issued for a different account, entity or mapping. */
+  | 'UNIFIED_SYNC_TOKEN_MISMATCH'
+  /** The cursor or token pins different filters than the ones sent with it. */
+  | 'UNIFIED_CURSOR_FILTER_MISMATCH';
+
+/** How a requested filter was honoured. */
+export interface AppliedFilter {
+  name: keyof UnifiedTimeFilters | string;
+  /** native: the platform applied it; unavailable: this account's system cannot — the filter had no effect. */
+  mode: 'native' | 'unavailable';
+}
+
 /** Query params for reading unified records. */
 export interface GetUnifiedRecordsQuery {
   /** Scope the read to a specific unified API instance. */
@@ -203,10 +240,37 @@ export interface GetUnifiedRecordsQuery {
   cursor?: string;
   /** Page size, max 1000. */
   pageSize?: number;
-  /** Incremental-sync watermark (e.g. an updated-at timestamp). */
+  /** Alias of `since`, kept for compatibility. */
   watermark?: string;
-  /** Entity-specific filters, mapped through the contract's filter mapping. */
-  filters?: Record<string, string>;
+  /**
+   * Read only records changed since a point in time. Pass either an RFC 3339
+   * date-time or the `pagination.syncToken` from a previous completed read —
+   * anything else is `422 INVALID_SINCE_VALUE`, and on a system with
+   * `syncSupport: 'none'` it is `422 INCREMENTAL_SYNC_NOT_SUPPORTED`.
+   *
+   * A token pins the filters of the read that produced it; sending different
+   * filters with it is `409 UNIFIED_CURSOR_FILTER_MISMATCH`. Combined with
+   * `updatedAfter`, the later of the two bounds is applied.
+   * Preferred over `watermark` (same semantics, kept as an alias).
+   */
+  since?: string;
+  /** Records created at or after this RFC 3339 instant. */
+  createdAfter?: string;
+  /** Records created before this RFC 3339 instant. */
+  createdBefore?: string;
+  /**
+   * Records updated at or after this RFC 3339 instant. On a system that
+   * supports incremental reads this rides the same watermark as `since`
+   * (the later bound wins when both are sent).
+   */
+  updatedAfter?: string;
+  /** Records updated before this RFC 3339 instant. */
+  updatedBefore?: string;
+  /**
+   * @deprecated Pass the time filters as top-level fields instead. Still
+   * accepted by the API (sent as filters[name]=value).
+   */
+  filters?: UnifiedTimeFilters;
 }
 
 /** Pagination info returned with unified reads. */
@@ -214,6 +278,17 @@ export interface UnifiedPagination {
   cursor?: string | null;
   hasMore?: boolean;
   pageSize?: number;
+  /**
+   * Present on the final page (`hasMore: false`) of a read against a system
+   * with native incremental support. Pass it as `since` on a later call to
+   * receive only records changed after this read completed.
+   *
+   * The checkpoint advances to the newest record seen; a replay that finds
+   * nothing new returns an identical token, so always store whatever comes
+   * back. Delivery is at-least-once: the record on the boundary may repeat —
+   * upsert on `externalId`.
+   */
+  syncToken?: string | null;
   [key: string]: unknown;
 }
 
@@ -221,6 +296,10 @@ export interface UnifiedPagination {
 export interface UnifiedRecordsPage<T = Record<string, unknown>> {
   success: boolean;
   data: T[];
+  /** Every requested filter and how it was applied. */
+  filtersApplied?: AppliedFilter[];
+  /** native: the platform honours `since`; none: `since` is rejected for this account's system. */
+  syncSupport?: 'native' | 'none';
   pagination?: UnifiedPagination;
 }
 
@@ -641,8 +720,10 @@ export interface EntityDocumentation {
   readable: boolean;
   /** True when the entity can be written through the Unified API. */
   writable: boolean;
-  /** Union of available filters across the entity's read operations. */
+  /** Filters accepted when reading this entity — from the contracts' filter mappings for this integration and any read-operation declarations. */
   filters: AvailableFilter[];
+  /** 'native' when at least one read operation honours `since`; 'none' otherwise. */
+  syncSupport: 'native' | 'none';
   /** Read operations backing unified GETs for this entity. */
   readOperations: ReadOperation[];
   /** Write operations backing unified POSTs for this entity. */

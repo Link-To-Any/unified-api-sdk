@@ -81,6 +81,17 @@ export class NotFoundError extends LinkToAnyError {}
 export class ValidationError extends LinkToAnyError {}
 
 /**
+ * The request contradicts state the server already holds (HTTP 409). On
+ * unified reads this is a `cursor` or `since` token issued for a different
+ * read: `UNIFIED_SYNC_TOKEN_MISMATCH` (other account, entity or mapping) or
+ * `UNIFIED_CURSOR_FILTER_MISMATCH` (different filters than the token pins).
+ * Inspect `code` and start a fresh read.
+ *
+ * @category Errors
+ */
+export class ConflictError extends LinkToAnyError {}
+
+/**
  * Thrown when the organisation or account exceeds its unified API rate
  * limit (HTTP 429). The SDK retries these automatically; this error is
  * only thrown once all retries are exhausted.
@@ -143,6 +154,7 @@ export function errorFromResponse(
   if (status === 403) return new PermissionError(message, base);
   if (status === 404) return new NotFoundError(message, base);
   if (status === 400 || status === 422) return new ValidationError(message, base);
+  if (status === 409) return new ConflictError(message, base);
   if (status === 429) return new RateLimitError(message, { ...base, retryAfterSeconds });
   if (status >= 500) return new ServerError(message, base);
   return new LinkToAnyError(message, base);

@@ -9,7 +9,7 @@
  *   1. Create a client (environments, tenant context)
  *   2. Discover integrations & their documentation
  *   3. Connect an account to an integration
- *   4. Read unified records (pages, filters, full iteration)
+ *   4. Read unified records (pages, filters, full iteration, incremental reads)
  *   5. Write unified records
  *   6. Manage unified entity contracts
  *   7. Generate contracts with AI
@@ -141,11 +141,15 @@ async function main(): Promise<void> {
   // shape for every integration. `entityType` is a unified entity from your
   // contracts ('products', 'orders', ...).
 
-  // 4a. One page, with filters and page size:
+  // 4a. One page, with a time filter and page size. Filters are flat query
+  // params (createdAfter / createdBefore / updatedAfter / updatedBefore, RFC 3339)
+  // and `filtersApplied` reports whether the platform honoured each one
+  // ('native') or could not ('unavailable' — no effect, never emulated).
   const page = await client.records.list(accountId, 'orders', {
     pageSize: 2,
-    filters: { status: 'paid' } // keys come from docs.getEntityFilters(...)
+    updatedAfter: '2026-01-01T00:00:00Z'
   });
+  console.log(`filtersApplied=${JSON.stringify(page.filtersApplied)} syncSupport=${page.syncSupport}`);
   console.log(`Page of ${page.data.length} (hasMore=${page.pagination?.hasMore}):`);
   for (const order of page.data) {
     console.log(`  ${JSON.stringify(order)}`);
@@ -158,7 +162,23 @@ async function main(): Promise<void> {
   }
   console.log(`records.iterate walked ${total} orders across all pages`);
 
-  // 4c. Typed records:
+  // 4c. Incremental reads: where syncSupport is 'native', the final page of a
+  // read carries pagination.syncToken. Persist it and pass it back as `since`
+  // to get only what changed. iteratePages yields whole pages so the token on
+  // the last one is easy to grab.
+  let syncToken: string | null | undefined;
+  for await (const p of client.records.iteratePages(accountId, 'orders', { pageSize: 2 })) {
+    syncToken = p.pagination?.syncToken ?? syncToken;
+  }
+  console.log(`Full read done; syncToken=${syncToken?.slice(0, 24)}…`);
+  let changed = 0;
+  for await (const p of client.records.iteratePages(accountId, 'orders', { since: syncToken ?? undefined })) {
+    changed += p.data.length;
+    syncToken = p.pagination?.syncToken ?? syncToken; // unchanged when nothing new — store it anyway
+  }
+  console.log(`Replay with since=<token>: ${changed} changed records, token kept for next run`);
+
+  // 4d. Typed records:
   interface UnifiedOrder {
     id: string;
     status: string;
@@ -252,6 +272,7 @@ async function main(): Promise<void> {
 // ===========================================================================
 
 function mockUnifiedApi(): typeof fetch {
+  const SYNC_TOKEN = 'eyJ2IjoyLCJ0IjoidXMiLCJ3IjoiMjAyNi0wMS0wMVQwMDowMDowMFoifQ';
   const ORDERS = [
     { id: 'ord_1', status: 'paid', total: 42.5 },
     { id: 'ord_2', status: 'paid', total: 13.0 },
@@ -324,11 +345,19 @@ function mockUnifiedApi(): typeof fetch {
     if (path === `/unified/${ACCOUNT_ID}/orders` && method === 'GET') {
       const cursor = Number(url.searchParams.get('cursor') ?? 0);
       const pageSize = Number(url.searchParams.get('pageSize') ?? 100);
-      const slice = ORDERS.slice(cursor, cursor + pageSize);
+      // A replay with the token we issued has nothing new: one empty page, same token.
+      const since = url.searchParams.get('since');
+      const source = since === SYNC_TOKEN ? [] : ORDERS;
+      const slice = source.slice(cursor, cursor + pageSize);
       const next = cursor + pageSize;
+      const hasMore = next < source.length;
+      // Time filters come back as `native` (the platform applied them) or `unavailable`.
+      const filtersApplied = ['createdAfter', 'createdBefore', 'updatedAfter', 'updatedBefore']
+        .filter(name => url.searchParams.has(name))
+        .map(name => ({ name, mode: name.startsWith('updated') ? 'native' : 'unavailable' }));
       return json({
-        success: true, data: slice,
-        pagination: { cursor: next < ORDERS.length ? String(next) : null, hasMore: next < ORDERS.length, pageSize }
+        success: true, data: slice, filtersApplied, syncSupport: 'native',
+        pagination: { cursor: hasMore ? String(next) : null, hasMore, pageSize, syncToken: hasMore ? null : SYNC_TOKEN }
       });
     }
     if (path === `/unified/${ACCOUNT_ID}/products` && method === 'POST') {

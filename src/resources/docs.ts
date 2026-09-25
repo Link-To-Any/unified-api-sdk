@@ -9,6 +9,7 @@
 
 import type {
   AvailableFilter,
+  UnifiedFilterMapping,
   EntityDocumentation,
   IntegrationDocumentation,
   ObjectId,
@@ -110,8 +111,9 @@ export class DocsResource {
     entityType: string,
     options?: RequestOptions
   ): Promise<AvailableFilter[]> {
-    const { data } = await this.integrations.listReadOperations({ systemId, entityType }, options);
-    return dedupeFilters(data.flatMap(operation => operation.availableFilters ?? []));
+    const docs = await this.describeIntegration(systemId, options);
+    const key = entityType.toLowerCase();
+    return docs.entities.find(entity => entity.entityType === key)?.filters ?? [];
   }
 
   /**
@@ -163,6 +165,7 @@ function buildEntityDocs(
         readable: false,
         writable: false,
         filters: [],
+        syncSupport: 'none',
         readOperations: [],
         writeOperations: [],
         contracts: []
@@ -178,6 +181,7 @@ function buildEntityDocs(
     doc.readable = true;
     doc.readOperations.push(operation);
     doc.filters = dedupeFilters([...doc.filters, ...(operation.availableFilters ?? [])]);
+    if (readOperationSupportsSince(operation)) doc.syncSupport = 'native';
   }
 
   for (const operation of writeOperations) {
@@ -188,6 +192,12 @@ function buildEntityDocs(
   }
 
   for (const contract of contracts) {
+    // Filters are declared per read mapping; surface the ones for this integration.
+    for (const mapping of contract.readMappings ?? []) {
+      if (mapping.systemId !== systemId || !mapping.sourceEntityType || !mapping.filterMapping?.length) continue;
+      const doc = entry(mapping.sourceEntityType);
+      doc.filters = dedupeFilters([...doc.filters, ...mapping.filterMapping.map(filterFromMapping)]);
+    }
     const mappings = [
       ...(contract.readMappings ?? []).map(m => ({ systemId: m.systemId, entityType: m.sourceEntityType })),
       ...(contract.writeMappings ?? []).map(m => ({ systemId: m.systemId, entityType: m.targetEntityType }))
@@ -202,6 +212,23 @@ function buildEntityDocs(
   }
 
   return [...entities.values()].sort((a, b) => a.entityType.localeCompare(b.entityType));
+}
+
+/** A `since` value is only honoured when the read operation declares how (windowing or SQL whereTemplate). */
+function readOperationSupportsSince(operation: ReadOperation): boolean {
+  const windowing = operation.windowing as { watermarkField?: string } | undefined;
+  const query = operation.query as { mode?: string; whereTemplate?: string } | undefined;
+  return Boolean(windowing?.watermarkField) || (query?.mode === 'sql' && Boolean(query?.whereTemplate));
+}
+
+function filterFromMapping(mapping: UnifiedFilterMapping): AvailableFilter {
+  const options = mapping.valueMapping ? Object.keys(mapping.valueMapping) : undefined;
+  return {
+    paramName: mapping.unifiedParam,
+    label: mapping.unifiedParam,
+    type: options ? 'enum' : 'string',
+    ...(options ? { options: options.map(value => ({ label: value, value })) } : {})
+  };
 }
 
 /** Dedupe filters by paramName, first occurrence wins. */

@@ -265,7 +265,7 @@ describe('docs helpers', () => {
     assert.deepEqual(entities.map(e => e.entityType), ['customer', 'order', 'product']);
   });
 
-  it('getEntityFilters queries scoped sync configs and dedupes', async () => {
+  it('getEntityFilters merges contract filter mappings with read-operation filters and dedupes', async () => {
     const { fetch, calls } = routedFetch([
       {
         match: url => url.pathname === '/system-integration/sync-configs',
@@ -276,20 +276,71 @@ describe('docs helpers', () => {
             { _id: '2'.repeat(24), entityType: 'order', availableFilters: [FILTER_STATUS, FILTER_FROM] }
           ]
         }
-      }
+      },
+      {
+        match: url => url.pathname === '/unified',
+        body: {
+          success: true,
+          data: [
+            {
+              _id: '3'.repeat(24),
+              entityType: 'order',
+              readMappings: [
+                {
+                  key: 'order-read',
+                  systemId: SYSTEM_ID,
+                  sourceEntityType: 'order',
+                  filterMapping: [
+                    { unifiedParam: 'customerId', templateKey: 'cust' },
+                    // same name as a read-operation filter — the first occurrence (read op) wins
+                    { unifiedParam: 'orderStatus', templateKey: 'st', valueMapping: { paid: 'PAID' } }
+                  ]
+                },
+                // another system's mapping must not leak into this integration's docs
+                { key: 'other-read', systemId: OTHER_SYSTEM, sourceEntityType: 'order', filterMapping: [{ unifiedParam: 'region', templateKey: 'r' }] }
+              ],
+              writeMappings: []
+            }
+          ]
+        }
+      },
+      { match: () => true, body: { success: true, data: {} } }
     ]);
     const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
 
     const filters = await client.docs.getEntityFilters(SYSTEM_ID, 'order');
 
-    const url = new URL(calls[0]!.url);
-    assert.equal(url.searchParams.get('systemId'), SYSTEM_ID);
-    assert.equal(url.searchParams.get('entityType'), 'order');
-    assert.deepEqual(filters.map(f => f.paramName).sort(), ['fromDate', 'orderStatus']);
+    const readOpsCall = calls.find(c => new URL(c.url).pathname === '/system-integration/sync-configs');
+    assert.equal(new URL(readOpsCall!.url).searchParams.get('systemId'), SYSTEM_ID);
+    assert.deepEqual(filters.map(f => f.paramName).sort(), ['customerId', 'fromDate', 'orderStatus']);
     assert.deepEqual(filters.find(f => f.paramName === 'orderStatus')?.options?.map(o => o.value), [
       'paid',
       'pending'
     ]);
+    assert.equal(filters.find(f => f.paramName === 'customerId')?.type, 'string');
+  });
+
+  it('describeIntegration reports native sync support only when a read operation can honour since', async () => {
+    const { fetch } = routedFetch([
+      {
+        match: url => url.pathname === '/system-integration/sync-configs',
+        body: {
+          success: true,
+          data: [
+            { _id: '1'.repeat(24), entityType: 'order', windowing: { type: 'timestamp', watermarkField: 'updated_at' } },
+            { _id: '2'.repeat(24), entityType: 'customer', pagination: { strategy: 'cursor' } },
+            { _id: '4'.repeat(24), entityType: 'invoice', query: { mode: 'sql', whereTemplate: "LastUpdatedTime > '{{watermark}}'" } }
+          ]
+        }
+      },
+      { match: () => true, body: { success: true, data: [] } }
+    ]);
+    const client = new LinkToAny({ apiKey: 'k', environment: 'dev', fetch });
+
+    const docs = await client.docs.describeIntegration(SYSTEM_ID);
+    const support = Object.fromEntries(docs.entities.map(e => [e.entityType, e.syncSupport]));
+
+    assert.deepEqual(support, { customer: 'none', invoice: 'native', order: 'native' });
   });
 
   it('describeAllIntegrations documents every catalogued system', async () => {

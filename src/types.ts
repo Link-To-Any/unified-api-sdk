@@ -89,16 +89,91 @@ export interface RequestOptions {
 /**
  * Payload for {@link AuthResource.connectAccount}. Contents depend on the
  * integration's auth type — OAuth integrations typically need merchant
- * identifiers (e.g. `shop` for Shopify), direct-auth integrations need
- * credentials.
+ * identifiers (e.g. `shop` for Shopify); direct-auth integrations (noauth /
+ * api key / basic / bearer) need the credentials themselves, sent as
+ * top-level fields named exactly as {@link LinkRequirements.requiredFields}
+ * lists them (`sourceField`). A missing field is `422` with `missingFields`
+ * in the error body — nothing is created.
  */
 export interface ConnectAccountRequest {
-  /** Merchant identifier in your platform. */
+  /**
+   * The merchant's identifier **on the platform**, for integrations whose
+   * unique field is named `merchantId` (Clover: the Clover merchant id).
+   * It is read only when {@link LinkRequirements.requiredFields} lists a
+   * `merchantId` source field; for every other integration it is ignored.
+   * OAuth integrations resolve the identity themselves — from the
+   * provider's redirect (Clover `merchant_id`) or token exchange (Square
+   * `merchant_id`) — so leave it out unless you already hold the platform's
+   * id: a value sent here wins over what the provider reports. The
+   * resulting account's `merchantId` is always the platform's identity,
+   * never an id of your own.
+   */
   merchantId?: string;
-  /** URL the user is redirected back to after completing OAuth. */
+  /** Where the merchant's browser lands after completing OAuth. */
+  successUrl?: string;
+  /** Where the merchant's browser lands if OAuth is declined or fails. */
+  failureUrl?: string;
+  /** @deprecated Use `successUrl`. */
   returnUrl?: string;
-  /** Integration-specific fields (e.g. `shop`, `apiKey`, `username`...). */
+  /** Integration-specific fields (e.g. `shop`, `personalToken`, `apiKey`, `username`...). */
   [key: string]: unknown;
+}
+
+/** One field a merchant must supply to connect a direct-auth integration. */
+export interface LinkRequiredField {
+  /** Variable name the Unified API stores the value under. */
+  name: string;
+  /** Key to send it as in the {@link ConnectAccountRequest} payload. */
+  sourceField: string;
+  label?: string;
+  placeholder?: string;
+  description?: string;
+  /** Identifies the merchant on the platform; used to detect duplicate connections. */
+  isUnique?: boolean;
+}
+
+/**
+ * What connecting an account to an integration takes, from
+ * {@link AuthResource.getLinkRequirements}. Branch on `mode` before calling
+ * `connectAccount`: `'oauth_redirect'` returns an `authUrl`, `'form'` creates
+ * the account from `requiredFields` in the payload.
+ */
+export interface LinkRequirements {
+  systemId: ObjectId;
+  systemName: string;
+  /** Auth type of the credential set that will be used (`oauth2`, `noauth`, `apikey`, ...). */
+  authType: string;
+  clientCredentialId: ObjectId;
+  /** The `application` slug to pass to `connectAccount`. */
+  application: string;
+  mode: 'oauth_redirect' | 'form';
+  /**
+   * The integration's merchant-supplied fields. For `mode: 'form'` send every
+   * `sourceField` in the `connectAccount` payload. For `mode: 'oauth_redirect'`
+   * the list is informational: the values are resolved from the provider's
+   * redirect or token exchange after consent, and the payload may omit them.
+   */
+  requiredFields: LinkRequiredField[];
+  /** Every credential set the integration has, if you need a different `application`. */
+  availableApplications: Array<{ application: string; authType: string }>;
+}
+
+/**
+ * Extra fields on the `body` of a `ValidationError` thrown by
+ * {@link AuthResource.connectAccount}.
+ */
+export interface ConnectAccountErrorBody {
+  success: false;
+  message: string;
+  error: string;
+  systemId?: ObjectId;
+  application?: string;
+  /** Direct-auth: payload fields the integration needs that were not sent. */
+  missingFields?: string[];
+  /** Direct-auth: every field the integration needs. */
+  requiredFields?: LinkRequiredField[];
+  /** Wrong `application` slug: the credential sets that do exist. */
+  availableApplications?: Array<{ application: string; authType: string }>;
 }
 
 /** Token bundle stored on a connected account. */

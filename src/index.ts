@@ -42,6 +42,9 @@ export type {
   // Auth / connection
   ConnectAccountRequest,
   ConnectAccountResponse,
+  ConnectAccountErrorBody,
+  LinkRequirements,
+  LinkRequiredField,
   AuthStatus,
   TokenInfo,
   // Accounts

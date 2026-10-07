@@ -10,6 +10,7 @@ import type {
   AuthStatus,
   ConnectAccountRequest,
   ConnectAccountResponse,
+  LinkRequirements,
   ObjectId,
   RequestOptions,
   TokenInfo
@@ -29,34 +30,85 @@ export class AuthResource {
   constructor(private readonly http: HttpClient) {}
 
   /**
+   * What connecting an account to an integration takes — call this before
+   * {@link connectAccount} when you don't already know whether the
+   * integration redirects (OAuth) or asks the merchant for credentials.
+   *
+   * `mode: 'oauth_redirect'` → `connectAccount` returns an `authUrl`; the
+   * merchant identity is resolved after consent from the provider's redirect
+   * or token exchange, so `requiredFields` is informational there.
+   * `mode: 'form'` → send every `requiredFields[].sourceField` in the
+   * `connectAccount` payload; the account is created immediately.
+   * `application` is the slug to pass to `connectAccount`. An integration can
+   * have both kinds of credential set (Clover US has an OAuth set and an API
+   * token set) — `availableApplications` lists them.
+   *
+   * Only credential sets that `connectAccount` can use are considered.
+   *
+   * @param systemId - Id of the integration.
+   *
+   * @example
+   * ```ts
+   * const reqs = await client.auth.getLinkRequirements(cloverUs._id);
+   * // { mode: 'form', application: 'clover-us', authType: 'noauth',
+   * //   requiredFields: [{ sourceField: 'personalToken' }, { sourceField: 'merchantId', isUnique: true }] }
+   * ```
+   */
+  async getLinkRequirements(systemId: ObjectId, options?: RequestOptions): Promise<LinkRequirements> {
+    const res = await this.http.request<ApiResponse<LinkRequirements>>({
+      method: 'GET',
+      path: '/account/link-requirements',
+      query: { systemId, ssoEnabled: false },
+      options
+    });
+    return res.data;
+  }
+
+  /**
    * Start connecting an account to an integration.
    *
    * For OAuth integrations the response contains `data.authUrl` —
    * redirect the end user there to complete authorization; the Unified
-   * API handles the callback and stores the tokens. For direct-auth
-   * integrations (api key, basic, bearer) the account is created
-   * immediately and the response contains `data.accountId` and
-   * `data.tokenInfo` — the `accountId` is what you pass to every
-   * unified record call.
+   * API handles the callback, resolves the merchant identity from the
+   * provider (Clover's redirect carries `merchant_id`, Square's token
+   * exchange does), stores the tokens and sends the merchant to
+   * `successUrl` with `?accountId=…&merchantId=<platform merchant id>`.
+   * No merchant identifier is needed in the payload. For direct-auth integrations
+   * (noauth / api key / basic / bearer) the account is created
+   * immediately from the credentials in the payload and the response
+   * contains `data.accountId` and `data.tokenInfo` — the `accountId` is
+   * what you pass to every unified record call.
+   *
+   * Direct-auth payload fields are named by
+   * {@link getLinkRequirements | `getLinkRequirements(systemId).requiredFields[].sourceField`}.
+   * Leaving one out is a `ValidationError` whose `body.missingFields`
+   * lists them; a wrong `application` slug is a `ValidationError` whose
+   * `body.availableApplications` lists the slugs that exist
+   * (see {@link ConnectAccountErrorBody}).
    *
    * @param systemId - Id of the integration to connect (e.g. Shopify).
-   * @param application - Application slug registered for the integration.
+   * @param application - Credential-set slug registered for the integration
+   *   (`getLinkRequirements(systemId).application`).
    * @param payload - Integration-specific connection data (merchant id,
-   *   credentials, `returnUrl`, ...).
+   *   credentials, `successUrl`, ...).
    *
    * @example
    * ```ts
-   * const result = await client.auth.connectAccount(systemId, 'shopify', {
-   *   merchantId: 'merchant-123',
-   *   shop: 'my-store.myshopify.com',
-   *   returnUrl: 'https://app.example.com/integrations/done'
+   * // OAuth integration (Square, Clover US OAuth set, Lightspeed K-Series, Shift4, Shopify, …):
+   * // nothing to identify the merchant — the provider reports it after consent
+   * const result = await client.auth.connectAccount(squareId, 'squareproduction-unified', {
+   *   successUrl: 'https://app.example.com/integrations/done',
+   *   failureUrl: 'https://app.example.com/integrations/failed'
    * });
+   * if (result.data.authType === 'oauth') redirect(result.data.authUrl!);
    *
-   * if (result.data.authType === 'oauth') {
-   *   redirect(result.data.authUrl!);
-   * } else {
-   *   console.log('Connected account', result.data.accountId);
-   * }
+   * // Direct-auth integration (Clover US API-token set, Clover Asia Pacific, Toast, …): the
+   * // merchant's own credentials, named as getLinkRequirements lists them
+   * const clover = await client.auth.connectAccount(cloverUsId, 'clover-us', {
+   *   merchantId: 'CPPAFM7RS9E51',   // Clover merchant id — also the unique field
+   *   personalToken: '0a1b2c3d-…'    // API token from the Clover dashboard
+   * });
+   * console.log('Connected account', clover.data.accountId);
    * ```
    */
   connectAccount(

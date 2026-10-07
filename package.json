@@ -1,6 +1,6 @@
 {
   "name": "@linktoany/sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Official Node.js / TypeScript SDK for the LinkToAny Unified API — auth, account connection and unified entity execution.",
   "license": "MIT",
   "author": "LinkToAny",

@@ -48,6 +48,8 @@ import {
 const LIVE = Boolean(process.env.LINKTOANY_API_KEY);
 const SYSTEM_ID = process.env.LINKTOANY_SYSTEM_ID ?? 'a1b2c3d4e5f6a1b2c3d4e5f6';
 const ACCOUNT_ID = process.env.LINKTOANY_ACCOUNT_ID ?? 'b2c3d4e5f6a1b2c3d4e5f6a1';
+// A direct-auth integration for the connect walkthrough (Clover US in mock mode).
+const CLOVER_SYSTEM_ID = process.env.LINKTOANY_CLOVER_SYSTEM_ID ?? 'c3d4e5f6a1b2c3d4e5f6a1b2';
 
 function heading(title: string): void {
   console.log(`\n${'='.repeat(74)}\n  ${title}\n${'='.repeat(74)}`);
@@ -110,14 +112,19 @@ async function main(): Promise<void> {
 
   // -------------------------------------------------------------------------
   heading('3. Connect an account to an integration');
-  // One connect per merchant per integration. OAuth integrations return an
-  // authUrl to redirect the user to; direct-auth integrations (apikey,
-  // basic, bearer) connect immediately and return the accountId.
+  // One connect per merchant per integration. Ask how the integration connects
+  // first: OAuth integrations return an authUrl to redirect the merchant to;
+  // direct-auth integrations (noauth / apikey / basic / bearer) take the
+  // merchant's credentials in the payload and connect immediately.
+  const reqs = await client.auth.getLinkRequirements(SYSTEM_ID);
+  console.log(`${reqs.systemName}: mode=${reqs.mode} application=${reqs.application} fields=${reqs.requiredFields.map(f => f.sourceField).join(', ') || 'none'}`);
 
-  const connection = await client.auth.connectAccount(SYSTEM_ID, 'shopify', {
-    merchantId: 'merchant-42',
+  // OAuth: no merchant identifier in the payload — the Unified API resolves it from the
+  // provider after consent (Shopify shop domain, Square/Clover merchant id) and appends it
+  // to successUrl as ?merchantId=…
+  const connection = await client.auth.connectAccount(SYSTEM_ID, reqs.application, {
     shop: 'demo-store.myshopify.com',
-    returnUrl: 'https://app.example.com/integrations/done'
+    successUrl: 'https://app.example.com/integrations/done'
   });
 
   let accountId = ACCOUNT_ID;
@@ -130,6 +137,24 @@ async function main(): Promise<void> {
     accountId = connection.data.accountId!;
     console.log(`Direct auth — connected immediately. accountId=${accountId}`);
   }
+
+  // Direct-auth integration, e.g. Clover US: send every requiredFields[].sourceField.
+  // Leaving one out is a ValidationError with body.missingFields — nothing is created.
+  const cloverReqs = await client.auth.getLinkRequirements(CLOVER_SYSTEM_ID);
+  try {
+    await client.auth.connectAccount(CLOVER_SYSTEM_ID, cloverReqs.application, { merchantId: 'CPPAFM7RS9E51' });
+  } catch (err) {
+    if (err instanceof ValidationError) {
+      console.log(`Clover connect refused: ${err.message} (missingFields=${JSON.stringify((err.body as any)?.missingFields)})`);
+    } else {
+      throw err;
+    }
+  }
+  const clover = await client.auth.connectAccount(CLOVER_SYSTEM_ID, cloverReqs.application, {
+    merchantId: 'CPPAFM7RS9E51',
+    personalToken: 'demo-personal-token'
+  });
+  console.log(`Clover connected with the merchant's own token. accountId=${clover.data.accountId}`);
 
   // Token health & maintenance (normally automatic):
   const tokenStatus = await client.auth.getTokenStatus(accountId);
@@ -329,6 +354,41 @@ function mockUnifiedApi(): typeof fetch {
           writeMappings: [{ key: 'shopify', systemId: SYSTEM_ID, targetEntityType: 'product' }]
         }
       ] });
+    }
+    if (path === '/account/link-requirements') {
+      const systemId = url.searchParams.get('systemId');
+      if (systemId === CLOVER_SYSTEM_ID) {
+        return json({ success: true, data: {
+          systemId, systemName: 'Clover US', authType: 'noauth', clientCredentialId: '5'.repeat(24),
+          application: 'clover-us', mode: 'form',
+          requiredFields: [
+            { name: 'personalToken', sourceField: 'personalToken', isUnique: false },
+            { name: 'merchantId', sourceField: 'merchantId', isUnique: true }
+          ],
+          availableApplications: [{ application: 'clover-us', authType: 'noauth' }]
+        } });
+      }
+      return json({ success: true, data: {
+        systemId, systemName: 'Shopify', authType: 'oauth2', clientCredentialId: '6'.repeat(24),
+        application: 'shopify', mode: 'oauth_redirect', requiredFields: [],
+        availableApplications: [{ application: 'shopify', authType: 'oauth2' }]
+      } });
+    }
+    if (path.startsWith(`/account/start/${CLOVER_SYSTEM_ID}/`)) {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      if (!body.personalToken) {
+        return json({
+          success: false, message: 'Failed to initiate authentication',
+          error: 'Missing required fields for Clover US: personalToken',
+          systemId: CLOVER_SYSTEM_ID, application: 'clover-us',
+          missingFields: ['personalToken'],
+          requiredFields: [{ name: 'personalToken', sourceField: 'personalToken' }, { name: 'merchantId', sourceField: 'merchantId', isUnique: true }]
+        }, 400);
+      }
+      return json({
+        success: true, message: 'Authentication completed successfully', systemId: CLOVER_SYSTEM_ID, application: 'clover-us',
+        data: { authType: 'direct', accountId: '7'.repeat(24), merchantId: body.merchantId, tokenInfo: { tokenType: 'NoAuth' }, instructions: 'Authentication completed, tokens are ready to use' }
+      });
     }
     if (path.startsWith('/account/start/')) {
       return json({

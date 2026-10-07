@@ -112,18 +112,34 @@ await client.integrations.getZodSchemas({ entityType: 'order' });
 
 ## Connect an account (`client.auth`)
 
-OAuth integrations return an authorization URL to redirect the user to; direct-auth integrations (API key / basic / bearer) connect immediately:
+Integrations connect in one of two ways. **OAuth 2.0** credential sets (Square, Lightspeed K-Series,
+Shift4, Shopify, QuickBooks, Xero, the Clover US OAuth set, …) return an authorization URL you redirect
+the merchant to; after consent the Unified API resolves the merchant identity from the provider
+(Clover's redirect carries `merchant_id`, Square's token exchange does) and stores the tokens.
+**Direct-auth** credential sets (Clover US API-token set, Clover Asia Pacific, Toast, Cin7 Core, …)
+take the merchant's own credentials in the payload and connect immediately. A system can offer
+both — `getLinkRequirements` tells you which one `connectAccount` will use and lists the others
+in `availableApplications`. Ask first, then branch:
 
 ```ts
-const result = await client.auth.connectAccount(systemId, 'shopify', {
-  merchantId: 'merchant-123',
-  shop: 'my-store.myshopify.com',
-  returnUrl: 'https://app.example.com/integrations/done'
-});
+const reqs = await client.auth.getLinkRequirements(systemId);
+// reqs.mode           'oauth_redirect' | 'form'
+// reqs.application    the slug to pass to connectAccount
+// reqs.requiredFields [{ sourceField: 'personalToken' }, { sourceField: 'merchantId', isUnique: true }]
+//                     send them for 'form'; informational for 'oauth_redirect' (the provider supplies them)
 
-if (result.data.authType === 'oauth') {
-  redirect(result.data.authUrl!); // Unified API handles callback + token storage
+if (reqs.mode === 'oauth_redirect') {
+  const result = await client.auth.connectAccount(systemId, reqs.application, {
+    successUrl: 'https://app.example.com/integrations/done',   // merchant lands here with ?accountId=…&merchantId=<platform id>
+    failureUrl: 'https://app.example.com/integrations/failed'
+  });
+  redirect(result.data.authUrl!); // Unified API handles callback + identity + token storage
 } else {
+  // Send every requiredFields[].sourceField as a top-level payload key
+  const result = await client.auth.connectAccount(systemId, reqs.application, {
+    merchantId: 'CPPAFM7RS9E51',   // Clover: the merchant id is also the unique field
+    personalToken: '0a1b2c3d-…'
+  });
   console.log('Connected:', result.data.accountId);
 }
 
@@ -131,6 +147,16 @@ await client.auth.getStatus(accountId);       // confirm after redirect
 await client.auth.getTokenStatus(accountId);  // token health
 await client.auth.refreshToken(accountId);    // force refresh (normally automatic)
 ```
+
+A missing direct-auth field throws `ValidationError` with `err.body.missingFields` (nothing is
+created); a wrong `application` slug throws `ValidationError` with `err.body.availableApplications`
+listing the slugs the integration does have.
+
+`merchantId` on the connected account is always the **platform's** merchant identity (Square
+`merchant_id`, Clover merchant id, QuickBooks realm) — not an id of your own — and it is what
+`accounts.listByMerchant` matches. Pass `merchantId` in the payload only for integrations whose
+required fields name it (Clover), and only as the platform's id: a value you send wins over what the
+provider reports after consent.
 
 Manage connected accounts with `client.accounts` — `create`, `list`, `get`, `update`, `delete`, `listBySystem`, `listByMerchant`, `updateTokens`.
 

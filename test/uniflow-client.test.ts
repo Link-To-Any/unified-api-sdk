@@ -392,6 +392,45 @@ describe('auth resource', () => {
     assert.equal(result.data.authUrl, 'https://auth.example.com');
   });
 
+  it('getLinkRequirements asks for the credential sets connectAccount can use and unwraps data', async () => {
+    const reqs = {
+      systemId: OID_A, systemName: 'Clover US', authType: 'noauth', clientCredentialId: OID_B,
+      application: 'clover-us', mode: 'form',
+      requiredFields: [{ name: 'personalToken', sourceField: 'personalToken' }, { name: 'merchantId', sourceField: 'merchantId', isUnique: true }],
+      availableApplications: [{ application: 'clover-us', authType: 'noauth' }]
+    };
+    const { client, calls } = okClient([{ status: 200, body: { success: true, message: 'ok', data: reqs } }]);
+    const result = await client.auth.getLinkRequirements(OID_A);
+
+    const url = new URL(calls[0]!.url);
+    assert.equal(url.pathname, '/account/link-requirements');
+    assert.equal(url.searchParams.get('systemId'), OID_A);
+    assert.equal(url.searchParams.get('ssoEnabled'), 'false');
+    assert.deepEqual(result, reqs);
+    assert.equal(result.requiredFields[1]!.isUnique, true);
+  });
+
+  it('connectAccount surfaces missingFields on a refused direct-auth connect', async () => {
+    const { client } = okClient([
+      {
+        status: 400,
+        body: {
+          success: false, message: 'Failed to initiate authentication',
+          error: 'Missing required fields for Clover US: personalToken',
+          systemId: OID_A, application: 'clover-us', missingFields: ['personalToken']
+        }
+      }
+    ]);
+    await assert.rejects(
+      client.auth.connectAccount(OID_A, 'clover-us', { merchantId: 'CPPAFM7RS9E51' }),
+      (err: ValidationError) => {
+        assert.ok(err instanceof ValidationError);
+        assert.deepEqual((err.body as { missingFields?: string[] }).missingFields, ['personalToken']);
+        return true;
+      }
+    );
+  });
+
   it('getStatus targets the public oauth status endpoint', async () => {
     const { client, calls } = okClient([
       { status: 200, body: { success: true, data: { accountId: OID_A, status: 'authenticated' } } }

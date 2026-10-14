@@ -45,6 +45,8 @@ export type {
   ConnectAccountErrorBody,
   LinkRequirements,
   LinkRequiredField,
+  CreateConnectLinkRequest,
+  ConnectLink,
   AuthStatus,
   TokenInfo,
   // Accounts
@@ -59,7 +61,11 @@ export type {
   UnifiedPagination,
   UnifiedRecordsPage,
   PostUnifiedRecordQuery,
+  PutUnifiedRecordQuery,
   UnifiedWriteResult,
+  UnifiedWriteErrorCode,
+  LightspeedKWebhookState,
+  RegisterLightspeedKWebhookRequest,
   // Entity contracts
   UnifiedFilterMapping,
   ReadMapping,
@@ -82,6 +88,10 @@ export type {
   InstanceEntitySelection,
   CreateUnifiedInstanceRequest,
   UnifiedApiInstance,
+  InstanceSystemEntitySupport,
+  InstanceSystemAccount,
+  InstanceSystem,
+  InstanceSystems,
   UnifiedInstanceGenerateRequest,
   // Request logs
   ListUnifiedRequestsQuery,

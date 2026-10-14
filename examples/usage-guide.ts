@@ -132,7 +132,7 @@ async function main(): Promise<void> {
     console.log(`OAuth flow — redirect the user to:\n  ${connection.data.authUrl}`);
     // After the redirect completes, poll the connection status:
     const status = await client.auth.getStatus(accountId);
-    console.log(`Connection status: ${status.data.status}`);
+    console.log(`Connection status: ${status.data.status} (authenticated=${status.data.isAuthenticated})`);
   } else {
     accountId = connection.data.accountId!;
     console.log(`Direct auth — connected immediately. accountId=${accountId}`);
@@ -225,6 +225,15 @@ async function main(): Promise<void> {
     price: 18.5
   });
   console.log(`Write success=${writeResult.success}: ${JSON.stringify(writeResult.data)}`);
+
+  // 5b. Update a record the integration already has: its platform id plus the
+  // same unified body. Per entity and integration — where no update operation
+  // is configured this is a ConflictError (409 RUNTIME_PUSH_CONFIG_NOT_FOUND).
+  const updateResult = await client.records.update(accountId, 'products', 'prd_8812', {
+    externalId: 'prd_8812',
+    price: 19.5
+  });
+  console.log(`Update success=${updateResult.success}: ${JSON.stringify(updateResult.data)}`);
 
   // -------------------------------------------------------------------------
   heading('6. Unified entity contracts');
@@ -396,11 +405,11 @@ function mockUnifiedApi(): typeof fetch {
         data: { authType: 'oauth', authUrl: 'https://demo-store.myshopify.com/admin/oauth/authorize?...', instructions: 'Redirect user to authUrl' }
       });
     }
-    if (path.startsWith('/oauth/status/')) {
-      return json({ success: true, data: { accountId: ACCOUNT_ID, status: 'authenticated' } });
+    if (path === `/account/${ACCOUNT_ID}` && method === 'GET') {
+      return json({ success: true, data: { _id: ACCOUNT_ID, status: 'active', systemId: SYSTEM_ID, merchantId: 'demo-store.myshopify.com' } });
     }
     if (path.endsWith('/token-status')) {
-      return json({ success: true, data: { valid: true, expiresAt: '2027-01-01T00:00:00Z' } });
+      return json({ success: true, data: { hasToken: true, needsRefresh: false, autoRefresh: true, status: 'active' } });
     }
     if (path === `/unified/${ACCOUNT_ID}/orders` && method === 'GET') {
       const cursor = Number(url.searchParams.get('cursor') ?? 0);
@@ -421,6 +430,10 @@ function mockUnifiedApi(): typeof fetch {
       });
     }
     if (path === `/unified/${ACCOUNT_ID}/products` && method === 'POST') {
+      const record = JSON.parse(String(init?.body ?? '{}'));
+      return json({ success: true, data: [{ key: 'shopify', status: 'created', externalId: 'prod_991', input: record.sku }] });
+    }
+    if (path === `/unified/${ACCOUNT_ID}/products/prd_8812` && method === 'PUT') {
       const record = JSON.parse(String(init?.body ?? '{}'));
       return json({ success: true, data: [{ key: 'shopify', status: 'created', externalId: 'prod_991', input: record.sku }] });
     }

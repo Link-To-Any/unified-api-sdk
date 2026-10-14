@@ -10,6 +10,8 @@ import type {
   AuthStatus,
   ConnectAccountRequest,
   ConnectAccountResponse,
+  ConnectLink,
+  CreateConnectLinkRequest,
   LinkRequirements,
   ObjectId,
   RequestOptions,
@@ -126,17 +128,82 @@ export class AuthResource {
   }
 
   /**
+   * Mint a shareable connect link for an integration — the hosted alternative
+   * to {@link connectAccount}. Send the merchant to `accountLinkUrl` (or open
+   * it yourself); LinkToAny drives the provider consent screen or a hosted
+   * credential form, creates the account, and sends the merchant to
+   * `successUrl` with `?accountId=…`.
+   *
+   * Prefer this over `connectAccount` for Square, Clover, Lightspeed and
+   * Shopify: those providers are connected through LinkToAny's own OAuth
+   * callback, which is the redirect URI registered with the provider. The
+   * `connectAccount` authorization URL uses the credential set's own
+   * callback, which the provider rejects as an invalid redirect URI unless
+   * it has been registered too.
+   *
+   * Links expire (`expiresAt`) and create nothing until the merchant
+   * completes them, so minting one is side-effect free.
+   *
+   * @param systemId - Id of the integration to connect.
+   * @param payload - `successUrl`, optional `clientCredentialId` to pick a
+   *   credential set, `shopDomain` for Shopify.
+   *
+   * @example
+   * ```ts
+   * const link = await client.auth.createConnectLink(squareId, {
+   *   successUrl: 'https://app.example.com/integrations/done'
+   * });
+   * // link.mode === 'oauth_redirect' — hand link.accountLinkUrl to the merchant
+   * ```
+   */
+  async createConnectLink(
+    systemId: ObjectId,
+    payload: CreateConnectLinkRequest = {},
+    options?: RequestOptions
+  ): Promise<ConnectLink> {
+    const res = await this.http.request<ApiResponse<ConnectLink>>({
+      method: 'POST',
+      path: '/account/create-link-url',
+      body: { systemId, ...payload },
+      options
+    });
+    return res.data;
+  }
+
+  /**
    * Get the authentication status of an account — use after an OAuth
-   * redirect to confirm the connection completed.
+   * redirect (or once the merchant finished a connect link) to confirm the
+   * connection completed.
+   *
+   * Composed from the account record and its token health, both served under
+   * `/account`. (The server's `/oauth/status` route lives outside the public
+   * API prefix and is not reachable through the API host.)
    *
    * @param accountId - Id of the account being connected.
    */
-  getStatus(accountId: ObjectId, options?: RequestOptions): Promise<ApiResponse<AuthStatus>> {
-    return this.http.request({
-      method: 'GET',
-      path: `/oauth/status/${encodeURIComponent(accountId)}`,
-      options
-    });
+  async getStatus(accountId: ObjectId, options?: RequestOptions): Promise<ApiResponse<AuthStatus>> {
+    const id = encodeURIComponent(accountId);
+    const [account, token] = await Promise.all([
+      this.http.request<ApiResponse<Record<string, unknown>>>({ method: 'GET', path: `/account/${id}`, options }),
+      this.http.request<ApiResponse<Record<string, unknown>>>({ method: 'GET', path: `/account/${id}/token-status`, options })
+    ]);
+    const a = account.data ?? {};
+    const t = token.data ?? {};
+    const systemId = a.systemId as ObjectId | { _id?: ObjectId } | undefined;
+    return {
+      success: account.success && token.success,
+      message: account.message,
+      data: {
+        accountId: String(a._id ?? accountId),
+        status: String(a.status ?? t.status ?? 'unknown'),
+        hasToken: Boolean(t.hasToken),
+        needsRefresh: Boolean(t.needsRefresh),
+        isAuthenticated: Boolean(t.hasToken) && String(a.status ?? '') === 'active',
+        merchantId: a.merchantId as string | undefined,
+        systemId: typeof systemId === 'object' && systemId ? systemId._id : systemId,
+        lastAuthAt: a.lastAuthAt as string | undefined
+      }
+    };
   }
 
   /**

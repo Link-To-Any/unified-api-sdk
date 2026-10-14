@@ -100,7 +100,8 @@ await client.docs.describeAllIntegrations();              // whole catalogue
 Raw resources:
 
 ```ts
-await client.integrations.list({ status: 'active' });     // catalogue
+await client.integrations.list({ status: 'active' });     // catalogue, one page (10 by default, max 100)
+await client.integrations.listAll({ status: 'active' });  // whole catalogue, paging handled
 await client.integrations.get(systemId);                  // one integration
 await client.integrations.getSupportedAuthTypes();        // auth types
 await client.integrations.listByAuthType('oauth2');       // filter by auth
@@ -109,6 +110,26 @@ await client.integrations.listWriteOperations({ systemId });  // unified POST ta
 await client.integrations.getSchemaTemplates({ entityType: 'order' });
 await client.integrations.getZodSchemas({ entityType: 'order' });
 ```
+
+## What your instance supports (`client.instances.listSystems`)
+
+The catalogue above is the whole platform. What you should offer merchants is the set of
+integrations your **instance** supports — the ones in its chosen vertical — each with the entity
+types it can read or write and the accounts already connected:
+
+```ts
+const { vertical, systems } = await client.instances.listSystems();
+// vertical: 'restaurant_v3'
+for (const s of systems) {
+  console.log(
+    s.name,                                                     // 'Square'
+    s.entityTypes.filter(e => e.read).map(e => e.entityType),   // ['category', 'order', …]
+    s.connectedAccountCount, s.accounts.map(a => a.merchantId)  // who is already connected
+  );
+}
+```
+
+Pass `systems[i].systemId` to `auth.getLinkRequirements` / `auth.createConnectLink` / `auth.connectAccount`.
 
 ## Connect an account (`client.auth`)
 
@@ -143,6 +164,15 @@ if (reqs.mode === 'oauth_redirect') {
   console.log('Connected:', result.data.accountId);
 }
 
+// Shareable connect link — the hosted alternative. Prefer it for Square, Clover,
+// Lightspeed and Shopify: it uses LinkToAny's own OAuth callback, the redirect URI
+// registered with those providers. The link expires and creates nothing until the
+// merchant completes it.
+const link = await client.auth.createConnectLink(systemId, {
+  successUrl: 'https://app.example.com/integrations/done'
+});
+sendToMerchant(link.accountLinkUrl); // or redirect(link.accountLinkUrl)
+
 await client.auth.getStatus(accountId);       // confirm after redirect
 await client.auth.getTokenStatus(accountId);  // token health
 await client.auth.refreshToken(accountId);    // force refresh (normally automatic)
@@ -159,6 +189,14 @@ required fields name it (Clover), and only as the platform's id: a value you sen
 provider reports after consent.
 
 Manage connected accounts with `client.accounts` — `create`, `list`, `get`, `update`, `delete`, `listBySystem`, `listByMerchant`, `updateTokens`.
+`list` sees every account your key owns across all integrations (paged, 10 per page by default) and
+filters by `systemId`, `merchantId`, `status` and `type`:
+
+```ts
+const { data: all } = await client.accounts.list({ limit: 100 });                 // every integration
+const { data: square } = await client.accounts.listBySystem(squareSystemId);       // one integration
+const { data: live } = await client.accounts.list({ status: 'active', limit: 100 });
+```
 
 ## Read unified records (`client.records`)
 
@@ -190,6 +228,9 @@ const { data } = await client.records.list<Order>(accountId, 'order');
 
 Values are RFC 3339; the SDK never needs a platform-specific format — LinkToAny converts to
 epoch milliseconds for Clover, ISO for Square, and so on.
+
+
+Beyond the time filters, pass any filter the entity's reference page lists under *Query parameters* (`status`, `active`, Lightspeed's `menuId`, …) as a top-level field; an undeclared name is `422 UNKNOWN_FILTER`, and a declared one the platform cannot apply comes back as `unavailable` in `filtersApplied`.
 
 ### Incremental reads (`since` / `syncToken`)
 
@@ -228,6 +269,25 @@ await client.records.create(accountId, 'products', {
   sku: 'ESP-1KG',
   price: 18.5
 });
+```
+
+To change a record the integration already has, `records.update` takes its platform id and the same unified body. Update support is per entity and per integration: where none is configured the call is `409 RUNTIME_PUSH_CONFIG_NOT_FOUND`, and re-sending `records.create` with the same `externalId` (the idempotency key) is the way to push the change.
+
+```ts
+await client.records.update(accountId, 'products', 'prd_8812', { externalId: 'prd_8812', price: 19.5 });
+```
+
+### Lightspeed K-Series: webhook endpoint for order and payment writes
+
+Lightspeed K-Series confirms order and payment writes through a webhook endpoint registered per connected account. LinkToAny never registers it on its own; check and register it explicitly, once per account (other systems answer `422 LIGHTSPEED_K_ONLY`):
+
+```ts
+const { data: hook } = await client.records.lightspeedKWebhook(accountId);
+if (!hook.registered) {
+  await client.records.registerLightspeedKWebhook(accountId); // LinkToAny's receiver, id linktoany-<accountId>
+}
+// or with your own values (the URL must be https):
+await client.records.registerLightspeedKWebhook(accountId, { endpointId: 'my-pos-bridge', url: 'https://hooks.example.com/lightspeed' });
 ```
 
 ## Observability (`client.requests`, `client.rateLimits`)
@@ -279,6 +339,20 @@ Every error carries `code` (typed for unified reads as `UnifiedReadErrorCode`), 
 | `UNIFIED_SYNC_TOKEN_MISMATCH` | `ConflictError` | Token from another account, entity or mapping |
 | `UNIFIED_CURSOR_FILTER_MISMATCH` | `ConflictError` | Cursor/token pins different filters than those sent |
 
+Codes a write (`create` / `update`) can fail with, typed as `UnifiedWriteErrorCode`:
+
+| `code` | Error | Meaning |
+|--------|-------|---------|
+| `ENTITY_UNSUPPORTED` | `ValidationError` | The entity is not available for writing on this account's integration |
+| `ENTITY_SYNTHESIZED` | `ValidationError` | LinkToAny synthesizes this entity for the integration; nothing to write to |
+| `RUNTIME_PUSH_CONFIG_NOT_FOUND` | `ConflictError` | `update` on an entity the integration has no update operation for |
+| `UPSTREAM_REJECTED_REQUEST` | by the integration's own 4xx status (`ValidationError`, `NotFoundError`, `ConflictError`) | The integration rejected the request; `body.details.upstreamMessage` says why |
+| `UPSTREAM_AUTH_FAILED` | `ServerError` (502) | The integration refused the account's credentials — reconnect it |
+| `UPSTREAM_RATE_LIMITED` | `RateLimitError` | The integration's own rate limit was hit |
+| `UPSTREAM_TIMEOUT` / `UPSTREAM_SERVER_ERROR` / `UPSTREAM_REQUEST_FAILED` | `ServerError` | The integration timed out, failed or was unreachable |
+| `LIGHTSPEED_ENDPOINT_REGISTRATION_FAILED` | `ServerError` (502) | Lightspeed K-Series: `registerLightspeedKWebhook` was refused by Lightspeed |
+| `LIGHTSPEED_K_ONLY` | `ValidationError` | A Lightspeed K-Series webhook call on an account of another system |
+
 ## Timeouts, retries & cancellation
 
 ```ts
@@ -308,6 +382,24 @@ npx tsx examples/usage-guide.ts
 # Live mode — against the staging Unified API
 LINKTOANY_API_KEY=... LINKTOANY_SYSTEM_ID=... npx tsx examples/usage-guide.ts
 ```
+
+### Connect a Square account (`examples/connect-square.ts`)
+
+A minimal two-step script for an OAuth integration: step 1 mints a Square connect link
+(`auth.createConnectLink`) for the merchant to open, step 2 verifies the connected account after
+they approve. Set `LINKTOANY_SQUARE_CONNECT=start` to use `auth.connectAccount` instead.
+
+```bash
+# step 1 — print the Square authorization URL (open it in a browser and approve)
+LINKTOANY_API_KEY=ak_... npx tsx examples/connect-square.ts
+
+# step 2 — verify the account using the merchant id (external_id) appended to successUrl
+LINKTOANY_API_KEY=ak_... LINKTOANY_MERCHANT_ID=... npx tsx examples/connect-square.ts
+```
+
+Optional: `LINKTOANY_ENV` (`dev` default), `LINKTOANY_SQUARE_SYSTEM_ID` (discovered by name when
+omitted), `LINKTOANY_SQUARE_APPLICATION` / `LINKTOANY_SQUARE_CREDENTIAL_ID` (pick a credential
+set), `LINKTOANY_SUCCESS_URL`, `LINKTOANY_FAILURE_URL`.
 
 ## API reference (auto-generated docs)
 

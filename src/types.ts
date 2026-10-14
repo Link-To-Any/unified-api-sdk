@@ -159,6 +159,57 @@ export interface LinkRequirements {
 }
 
 /**
+ * Payload for {@link AuthResource.createConnectLink}.
+ */
+export interface CreateConnectLinkRequest {
+  /** Where the merchant lands once the connection completes. */
+  successUrl?: string;
+  /** Where the merchant lands if the connection fails (not every provider supports it). */
+  failureUrl?: string;
+  /**
+   * Use a specific credential set instead of the one resolved for your
+   * key (`getLinkRequirements(systemId).clientCredentialId`).
+   */
+  clientCredentialId?: ObjectId;
+  /** Shopify only: the merchant's `*.myshopify.com` domain. */
+  shopDomain?: string;
+  /** Optional identity of the end merchant, stamped into the link. */
+  endUserOriginId?: string;
+  endUserEmail?: string;
+  endUserOrgName?: string;
+}
+
+/**
+ * A shareable, time-limited connect link from
+ * {@link AuthResource.createConnectLink}. The merchant opens
+ * `accountLinkUrl` in a browser; nothing else is needed from your side.
+ *
+ * `mode: 'oauth_redirect'` — the link forwards to the provider's consent
+ * screen and LinkToAny creates the account after approval.
+ * `mode: 'form'` — the link opens a hosted credential form; `requiredFields`
+ * says what it asks for, in case you want to render your own.
+ */
+export type ConnectLink =
+  | {
+      mode: 'oauth_redirect';
+      /** `'authv2'` for Square, Clover, Lightspeed and Shopify; `'generic_oauth2'` otherwise. */
+      authMethod: 'authv2' | 'generic_oauth2';
+      systemId: ObjectId;
+      clientCredentialId: ObjectId;
+      accountLinkUrl: string;
+      expiresAt?: string;
+    }
+  | {
+      mode: 'form';
+      authType: string;
+      systemId: ObjectId;
+      clientCredentialId: ObjectId;
+      accountLinkUrl: string;
+      expiresAt?: string;
+      requiredFields: LinkRequiredField[];
+    };
+
+/**
  * Extra fields on the `body` of a `ValidationError` thrown by
  * {@link AuthResource.connectAccount}.
  */
@@ -210,11 +261,21 @@ export interface ConnectAccountResponse {
   };
 }
 
-/** Authentication status of an account. */
+/** Authentication status of an account, from {@link AuthResource.getStatus}. */
 export interface AuthStatus {
   accountId: ObjectId;
+  /** Account status (`active` once connected; `pending_auth` while the merchant has not approved). */
   status: string;
-  [key: string]: unknown;
+  /** Tokens are stored for the account. */
+  hasToken: boolean;
+  /** The stored token is due for refresh (refreshed automatically). */
+  needsRefresh: boolean;
+  /** `status === 'active'` and tokens are stored — safe to call unified records. */
+  isAuthenticated: boolean;
+  /** The platform's merchant identity (Square `merchant_id`, Clover merchant id, …). */
+  merchantId?: string;
+  systemId?: ObjectId;
+  lastAuthAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -258,9 +319,14 @@ export interface CreateAccountRequest {
 /** Query params for listing accounts. */
 export interface ListAccountsQuery {
   page?: number;
+  /** 1–100, default 10. */
   limit?: number;
+  /** Only accounts connected to this integration. */
   systemId?: ObjectId;
-  type?: string;
+  /** Only accounts for this platform merchant id. */
+  merchantId?: string;
+  status?: 'active' | 'inactive' | 'error' | 'pending_auth';
+  type?: 'pull' | 'push' | 'external';
   [key: string]: string | number | boolean | undefined;
 }
 
@@ -346,6 +412,14 @@ export interface GetUnifiedRecordsQuery {
    * accepted by the API (sent as filters[name]=value).
    */
   filters?: UnifiedTimeFilters;
+  /**
+   * Any other filter the entity declares (its reference page lists them under
+   * "Query parameters": `status`, `active`, `menuId`, …), sent as a flat query
+   * parameter. A name the entity does not declare is `422 UNKNOWN_FILTER`; a
+   * declared one the account's platform cannot apply is reported as
+   * `unavailable` in `filtersApplied` and has no effect.
+   */
+  [filter: string]: string | number | boolean | UnifiedTimeFilters | undefined;
 }
 
 /** Pagination info returned with unified reads. */
@@ -383,6 +457,64 @@ export interface PostUnifiedRecordQuery {
   /** Scope the write to a specific unified API instance. */
   unifiedApiId?: ObjectId;
 }
+
+/**
+ * Lightspeed K-Series only: the webhook endpoint the POS confirms order and payment
+ * writes through, registered per connected account, and whether it exists.
+ */
+export interface LightspeedKWebhookState {
+  accountId: ObjectId;
+  registered: boolean;
+  /** The registered endpoint id, or the default a registration would use (`linktoany-<accountId>`). */
+  endpointId?: string;
+  /** The callback URL Lightspeed calls once registered. */
+  url?: string;
+  /** LinkToAny's own receiver for this account — the default callback URL. */
+  receiverUrl?: string;
+  /** Business locations the endpoint is (or will be) attached to. */
+  locations: string[];
+  /** Unified entity types whose writes depend on it. */
+  entityTypes: string[];
+}
+
+/** Body for registering a Lightspeed K-Series webhook endpoint; both optional. */
+export interface RegisterLightspeedKWebhookRequest {
+  /** Endpoint id to register under (letters, digits, `.`, `_`, `-`); default `linktoany-<accountId>`. */
+  endpointId?: string;
+  /** `https://` callback URL Lightspeed will call; default LinkToAny's receiver (`receiverUrl`). Anything else is `422`. */
+  url?: string;
+}
+
+/** Query params for updating a unified record; same scoping as a create. */
+export type PutUnifiedRecordQuery = PostUnifiedRecordQuery;
+
+/**
+ * Machine-readable `code` values a unified write (`records.create`, `records.update`)
+ * can fail with, with the HTTP status each maps to. The error class follows the
+ * status (`ValidationError` for 400/422, `NotFoundError` for 404, `ConflictError` for 409, …).
+ */
+export type UnifiedWriteErrorCode =
+  /** 422 — the entity is not available for writing on this account's platform. */
+  | 'ENTITY_UNSUPPORTED'
+  /** 422 — the entity is synthesized by LinkToAny for this platform (e.g. order types where the POS has none); there is nothing to write to. */
+  | 'ENTITY_SYNTHESIZED'
+  /** 409 — the platform has no update operation configured for this entity (`records.update` only). */
+  | 'RUNTIME_PUSH_CONFIG_NOT_FOUND'
+  /** The platform's own 4xx status (400, 404, 409, 422 …) — it rejected the request; `body.details.upstreamMessage` carries its reason. */
+  | 'UPSTREAM_REJECTED_REQUEST'
+  /** 502 — the platform refused the account's credentials; reconnect the account. */
+  | 'UPSTREAM_AUTH_FAILED'
+  /** 429 — the platform's rate limit was hit; retry with backoff. */
+  | 'UPSTREAM_RATE_LIMITED'
+  /** 504 — the platform did not answer in time. */
+  | 'UPSTREAM_TIMEOUT'
+  /** 502 / 503 — the platform failed (5xx) or could not be reached. */
+  | 'UPSTREAM_SERVER_ERROR'
+  | 'UPSTREAM_REQUEST_FAILED'
+  /** 502 — Lightspeed K-Series only: `records.registerLightspeedKWebhook` was refused by Lightspeed; `message` carries its reason. */
+  | 'LIGHTSPEED_ENDPOINT_REGISTRATION_FAILED'
+  /** 422 — a Lightspeed K-Series webhook call on an account of another system. */
+  | 'LIGHTSPEED_K_ONLY';
 
 /** Result of a unified write. */
 export interface UnifiedWriteResult {
@@ -581,6 +713,56 @@ export interface UnifiedApiInstance {
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
+}
+
+/** What one system can do for an entity type inside the caller's instance. */
+export interface InstanceSystemEntitySupport {
+  entityType: string;
+  read: boolean;
+  write: boolean;
+  contractId?: ObjectId;
+  /** Unified filter names the read mapping accepts (`createdAfter`, …). */
+  filters: string[];
+  syncSupport: 'native' | 'none';
+  cursorStrategy?: string;
+}
+
+/** A connected account summary inside {@link InstanceSystem}. No tokens. */
+export interface InstanceSystemAccount {
+  accountId: ObjectId;
+  name: string;
+  status: string;
+  environment: string;
+  type: string;
+  merchantId?: string;
+  externalAccountId?: string;
+}
+
+/** One integration the caller's instance supports, with what it can do and who is connected. */
+export interface InstanceSystem {
+  systemId: ObjectId;
+  name?: string;
+  category?: string;
+  provider?: string;
+  supportedAuthTypes: string[];
+  entityTypes: InstanceSystemEntitySupport[];
+  accounts: InstanceSystemAccount[];
+  connectedAccountCount: number;
+  [key: string]: unknown;
+}
+
+/**
+ * The integrations the caller's current instance (its chosen vertical) supports,
+ * from {@link InstancesResource.listSystems}. This — not the whole catalogue — is
+ * what an integrator should offer merchants to connect.
+ */
+export interface InstanceSystems {
+  instanceId: ObjectId;
+  vertical?: string;
+  name?: string;
+  status: string;
+  total: number;
+  systems: InstanceSystem[];
 }
 
 /** Body for generating contracts scoped to an instance. */

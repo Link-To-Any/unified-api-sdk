@@ -392,6 +392,64 @@ describe('auth resource', () => {
     assert.equal(result.data.authUrl, 'https://auth.example.com');
   });
 
+  it('connectAccount for an OAuth integration (Square) sends only the redirect URLs and returns authUrl', async () => {
+    const { client, calls } = okClient([
+      {
+        status: 200,
+        body: {
+          success: true,
+          message: 'Authentication URL generated successfully',
+          systemId: OID_A,
+          application: 'square',
+          data: {
+            authType: 'oauth',
+            authUrl: 'https://connect.squareup.com/oauth2/authorize?client_id=sq0idp-x&state=abc',
+            callbackUrl: 'https://api.staging.linktoany.com/oauth/oauth2/callback/' + OID_A + '/square'
+          }
+        }
+      }
+    ]);
+    const result = await client.auth.connectAccount(OID_A, 'square', {
+      successUrl: 'https://app.example.com/done',
+      failureUrl: 'https://app.example.com/failed'
+    });
+
+    assert.equal(calls[0]!.method, 'POST');
+    assert.ok(calls[0]!.url.endsWith(`/account/start/${OID_A}/square`));
+    assert.equal(calls[0]!.headers['authorization'], 'Bearer test-key');
+    // No merchantId: Square reports merchant_id at token exchange.
+    assert.deepEqual(JSON.parse(calls[0]!.body!), {
+      successUrl: 'https://app.example.com/done',
+      failureUrl: 'https://app.example.com/failed'
+    });
+    assert.equal(result.data.authType, 'oauth');
+    assert.ok(result.data.authUrl!.startsWith('https://connect.squareup.com/oauth2/authorize'));
+    assert.equal(result.data.accountId, undefined);
+  });
+
+  it('createConnectLink posts systemId + payload to create-link-url and unwraps data', async () => {
+    const link = {
+      mode: 'oauth_redirect', authMethod: 'authv2', systemId: OID_A, clientCredentialId: OID_B,
+      accountLinkUrl: 'https://platform.staging.linktoany.com/auth/marketplace/account-link/abc',
+      expiresAt: '2026-10-16T03:21:41.645Z'
+    };
+    const { client, calls } = okClient([{ status: 200, body: { success: true, message: 'ok', data: link } }]);
+    const result = await client.auth.createConnectLink(OID_A, {
+      successUrl: 'https://app.example.com/done',
+      clientCredentialId: OID_B
+    });
+
+    assert.equal(calls[0]!.method, 'POST');
+    assert.ok(calls[0]!.url.endsWith('/account/create-link-url'));
+    assert.deepEqual(JSON.parse(calls[0]!.body!), {
+      systemId: OID_A,
+      successUrl: 'https://app.example.com/done',
+      clientCredentialId: OID_B
+    });
+    assert.deepEqual(result, link);
+    if (result.mode === 'oauth_redirect') assert.equal(result.authMethod, 'authv2');
+  });
+
   it('getLinkRequirements asks for the credential sets connectAccount can use and unwraps data', async () => {
     const reqs = {
       systemId: OID_A, systemName: 'Clover US', authType: 'noauth', clientCredentialId: OID_B,
@@ -431,13 +489,19 @@ describe('auth resource', () => {
     );
   });
 
-  it('getStatus targets the public oauth status endpoint', async () => {
+  it('getStatus composes the account record and its token status (no /oauth route on the API host)', async () => {
     const { client, calls } = okClient([
-      { status: 200, body: { success: true, data: { accountId: OID_A, status: 'authenticated' } } }
+      { status: 200, body: { success: true, data: { _id: OID_A, status: 'active', merchantId: 'MLACVFCAZKCJZ', systemId: { _id: OID_B, name: 'Square' }, lastAuthAt: '2026-10-13T03:35:18.202Z' } } },
+      { status: 200, body: { success: true, data: { hasToken: true, needsRefresh: false, status: 'active' } } }
     ]);
-    await client.auth.getStatus(OID_A);
-    assert.ok(calls[0]!.url.endsWith(`/oauth/status/${OID_A}`));
-    assert.equal(calls[0]!.method, 'GET');
+    const result = await client.auth.getStatus(OID_A);
+    const paths = calls.map(c => new URL(c.url).pathname).sort();
+    assert.deepEqual(paths, [`/account/${OID_A}`, `/account/${OID_A}/token-status`]);
+    assert.ok(calls.every(c => c.method === 'GET'));
+    assert.deepEqual(result.data, {
+      accountId: OID_A, status: 'active', hasToken: true, needsRefresh: false, isAuthenticated: true,
+      merchantId: 'MLACVFCAZKCJZ', systemId: OID_B, lastAuthAt: '2026-10-13T03:35:18.202Z'
+    });
   });
 
   it('refreshToken and getTokenStatus hit the account endpoints', async () => {
@@ -455,6 +519,53 @@ describe('auth resource', () => {
 // ---------------------------------------------------------------------------
 // Accounts resource
 // ---------------------------------------------------------------------------
+
+describe('integrations.listAll', () => {
+  it('walks every page at limit=100 and concatenates', async () => {
+    const pageOf = (n: number, start: number) => ({
+      status: 200,
+      body: { success: true, data: { systems: Array.from({ length: n }, (_, i) => ({ _id: String(start + i).padStart(24, '0'), name: `S${start + i}` })), pagination: { total: 164 } } }
+    });
+    const { client, calls } = okClient([pageOf(100, 0), pageOf(64, 100)]);
+    const all = await client.integrations.listAll({ status: 'active' });
+
+    assert.equal(all.length, 164);
+    assert.equal(all[163]!.name, 'S163');
+    assert.equal(calls.length, 2);
+    for (const [i, call] of calls.entries()) {
+      const url = new URL(call.url);
+      assert.equal(url.pathname, '/account/system');
+      assert.equal(url.searchParams.get('page'), String(i + 1));
+      assert.equal(url.searchParams.get('limit'), '100');
+      assert.equal(url.searchParams.get('status'), 'active');
+    }
+  });
+});
+
+describe('instances.listSystems', () => {
+  it('returns the systems the caller instance supports, unwrapped', async () => {
+    const body = {
+      success: true,
+      data: {
+        instanceId: OID_A, vertical: 'restaurant_v3', name: 'My Restaurant V3 Unified API', status: 'active', total: 1,
+        systems: [{
+          systemId: OID_B, name: 'Square', supportedAuthTypes: ['oauth2'],
+          entityTypes: [{ entityType: 'order', read: true, write: false, filters: [], syncSupport: 'none' }],
+          accounts: [{ accountId: 'c'.repeat(24), name: 'MLACVFCAZKCJZ account', status: 'active', environment: 'production', type: 'pull', merchantId: 'MLACVFCAZKCJZ' }],
+          connectedAccountCount: 1
+        }]
+      }
+    };
+    const { client, calls } = okClient([{ status: 200, body }]);
+    const result = await client.instances.listSystems();
+
+    assert.equal(calls[0]!.method, 'GET');
+    assert.equal(new URL(calls[0]!.url).pathname, '/unified/instance/systems');
+    assert.equal(result.vertical, 'restaurant_v3');
+    assert.equal(result.systems[0]!.name, 'Square');
+    assert.equal(result.systems[0]!.accounts[0]!.merchantId, 'MLACVFCAZKCJZ');
+  });
+});
 
 describe('accounts resource', () => {
   it('covers CRUD paths and methods', async () => {
@@ -475,10 +586,13 @@ describe('accounts resource', () => {
       `GET /account/${OID_A}`,
       `PUT /account/${OID_A}`,
       `DELETE /account/${OID_A}`,
-      `GET /account/system/${OID_B}`,
+      'GET /account',
       'GET /account/merchant/m%201'
     ]);
     assert.equal(new URL(calls[1]!.url).searchParams.get('limit'), '10');
+    // listBySystem is a systemId filter on the list endpoint — /account/system/:id is the
+    // integrations route and returns the system document, not accounts.
+    assert.equal(new URL(calls[5]!.url).searchParams.get('systemId'), OID_B);
   });
 
   it('updateTokens wraps tokenInfo and optional externalAccountInfo', async () => {

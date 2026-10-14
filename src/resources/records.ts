@@ -11,6 +11,10 @@ import type {
   GetUnifiedRecordsQuery,
   ObjectId,
   PostUnifiedRecordQuery,
+  PutUnifiedRecordQuery,
+  LightspeedKWebhookState,
+  RegisterLightspeedKWebhookRequest,
+  ApiResponse,
   RequestOptions,
   UnifiedRecordsPage,
   UnifiedWriteResult
@@ -36,9 +40,10 @@ export class RecordsResource {
    * @typeParam T - Shape of a unified record (defaults to a generic object).
    * @param accountId - Connected account to read from.
    * @param entityType - Unified entity type (e.g. `products`, `orders`).
-   * @param query - Pagination cursor, page size, `since` and time filters
-   *   (`createdAfter`, `createdBefore`, `updatedAfter`, `updatedBefore`).
-   *   Each filter is its own query parameter and any combination is allowed.
+   * @param query - Pagination cursor, page size, `since`, the time filters
+   *   (`createdAfter`, `createdBefore`, `updatedAfter`, `updatedBefore`) and any
+   *   filter the entity declares (`status`, `active`, `menuId`, …). Each filter is
+   *   its own query parameter and any combination is allowed.
    *
    * @example
    * ```ts
@@ -178,6 +183,68 @@ export class RecordsResource {
     return this.http.request({
       method: 'POST',
       path: `/unified/${encodeURIComponent(accountId)}/${encodeURIComponent(entityType)}`,
+      query: query as Record<string, QueryValue>,
+      body: record,
+      options
+    });
+  }
+
+  /**
+   * Update one record the connected platform already has. `id` is the record's
+   * identifier in that platform (the `externalId` a read returned); the body is
+   * the same unified shape {@link create} accepts and is validated and
+   * transformed the same way.
+   *
+   * Update support is per entity and per platform. Where the platform has no
+   * update operation configured the call is `409 RUNTIME_PUSH_CONFIG_NOT_FOUND`;
+   * an entity the platform does not expose at all is `422 ENTITY_UNSUPPORTED`.
+   * A downstream rejection is a `ValidationError` (422) carrying the platform's
+   * message.
+   *
+   * @param accountId - Connected account to write to.
+   * @param entityType - Unified entity type.
+   * @param id - The record's identifier in the connected platform.
+   * @param record - Record in the unified schema.
+   * @param query - Optional Unified API instance scoping.
+   *
+   * @example
+   * ```ts
+   * await client.records.update(accountId, 'products', 'prd_8812', {
+   *   externalId: 'prd_8812',
+   *   price: 19.5
+   * });
+   * ```
+   */
+  /**
+   * Lightspeed K-Series only. The POS confirms order and payment writes through a
+   * webhook endpoint registered per connected account; this reports whether the
+   * account has one. Any other system answers `422 LIGHTSPEED_K_ONLY`.
+   */
+  lightspeedKWebhook(accountId: ObjectId, options?: RequestOptions): Promise<ApiResponse<LightspeedKWebhookState>> {
+    return this.http.request({ method: 'GET', path: `/unified/${encodeURIComponent(accountId)}/lightspeed-k/webhook`, options });
+  }
+
+  /**
+   * Lightspeed K-Series only. Register the account's webhook endpoint. Without a body the
+   * defaults apply and an already registered account is left as it is; pass `endpointId`
+   * and/or an https `url` to register (or re-register) with your own values. `502
+   * LIGHTSPEED_ENDPOINT_REGISTRATION_FAILED` when Lightspeed refused it.
+   */
+  registerLightspeedKWebhook(accountId: ObjectId, body: RegisterLightspeedKWebhookRequest = {}, options?: RequestOptions): Promise<ApiResponse<LightspeedKWebhookState>> {
+    return this.http.request({ method: 'POST', path: `/unified/${encodeURIComponent(accountId)}/lightspeed-k/webhook`, body, options });
+  }
+
+  update(
+    accountId: ObjectId,
+    entityType: string,
+    id: string,
+    record: Record<string, unknown>,
+    query: PutUnifiedRecordQuery = {},
+    options?: RequestOptions
+  ): Promise<UnifiedWriteResult> {
+    return this.http.request({
+      method: 'PUT',
+      path: `/unified/${encodeURIComponent(accountId)}/${encodeURIComponent(entityType)}/${encodeURIComponent(id)}`,
       query: query as Record<string, QueryValue>,
       body: record,
       options

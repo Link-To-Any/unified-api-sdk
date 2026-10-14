@@ -86,17 +86,16 @@ export class AccountsResource {
     });
   }
 
-  /** List accounts connected to a given integration. */
+  /**
+   * List accounts connected to a given integration (`list({ systemId })`).
+   * Pass `query` for paging or a `status` filter.
+   */
   async listBySystem(
     systemId: ObjectId,
+    query: Omit<ListAccountsQuery, 'systemId'> = {},
     options?: RequestOptions
   ): Promise<ApiResponse<Account[]>> {
-    const response = await this.http.request<ApiResponse<unknown>>({
-      method: 'GET',
-      path: `/account/system/${encodeURIComponent(systemId)}`,
-      options
-    });
-    return normalizeListResponse<Account>(response, 'accounts');
+    return this.list({ ...query, systemId }, options);
   }
 
   /** List all accounts belonging to a merchant. */

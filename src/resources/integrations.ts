@@ -52,6 +52,33 @@ export class IntegrationsResource {
   }
 
   /**
+   * Every integration in the catalogue, paging handled for you.
+   *
+   * {@link list} pages 10 at a time by default and caps `limit` at 100;
+   * this walks the pages (largest page size) and concatenates them.
+   *
+   * @param query - Optional filters (`status`); `page` / `limit` are managed here.
+   *
+   * @example
+   * ```ts
+   * const systems = await client.integrations.listAll({ status: 'active' });
+   * const square = systems.find(s => s.name === 'Square');
+   * ```
+   */
+  async listAll(
+    query: Omit<ListIntegrationsQuery, 'page' | 'limit'> = {},
+    options?: RequestOptions
+  ): Promise<Integration[]> {
+    const PAGE_SIZE = 100;
+    const all: Integration[] = [];
+    for (let page = 1; ; page++) {
+      const { data } = await this.list({ ...query, page, limit: PAGE_SIZE }, options);
+      all.push(...data);
+      if (data.length < PAGE_SIZE) return all;
+    }
+  }
+
+  /**
    * Fetch a single integration by its `systemId` — name, description,
    * supported auth types, base URL and connection requirements.
    */

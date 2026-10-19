@@ -188,6 +188,8 @@ listing the slugs the integration does have.
 required fields name it (Clover), and only as the platform's id: a value you send wins over what the
 provider reports after consent.
 
+Credential sets belong to your organisation: register your own app with each platform and add it under Client credentials before connecting accounts — the [Client credentials guide](https://docs.linktoany.com/docs/client-credentials) lists every platform's portal, callback URL, scopes and token format. There is no shared default set, for testing included; a connect call without one throws `ValidationError` naming the system.
+
 Manage connected accounts with `client.accounts` — `create`, `list`, `get`, `update`, `delete`, `listBySystem`, `listByMerchant`, `updateTokens`.
 `list` sees every account your key owns across all integrations (paged, 10 per page by default) and
 filters by `systemId`, `merchantId`, `status` and `type`:

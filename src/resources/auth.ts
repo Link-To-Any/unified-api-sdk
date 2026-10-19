@@ -45,7 +45,10 @@ export class AuthResource {
    * have both kinds of credential set (Clover US has an OAuth set and an API
    * token set) — `availableApplications` lists them.
    *
-   * Only credential sets that `connectAccount` can use are considered.
+   * Only credential sets that `connectAccount` can use are considered: the
+   * ones your organisation registered under Client credentials (see
+   * https://docs.linktoany.com/docs/client-credentials). There is no shared
+   * default, so a system without one throws `ValidationError`.
    *
    * @param systemId - Id of the integration.
    *

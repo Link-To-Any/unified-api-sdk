@@ -223,8 +223,12 @@ export interface ConnectAccountErrorBody {
   missingFields?: string[];
   /** Direct-auth: every field the integration needs. */
   requiredFields?: LinkRequiredField[];
-  /** Wrong `application` slug: the credential sets that do exist. */
-  availableApplications?: Array<{ application: string; authType: string }>;
+  /**
+   * Wrong `application` slug: the credential sets your organisation does have for the
+   * system, nearest first (`user` = your own set, `organisation` = your organisation's).
+   * Credential sets belong to your organisation; there is no shared default.
+   */
+  availableApplications?: Array<{ application: string; authType: string; scope?: 'organisation' | 'user' }>;
 }
 
 /** Token bundle stored on a connected account. */

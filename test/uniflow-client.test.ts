@@ -843,3 +843,22 @@ describe('list response normalization', () => {
     assert.deepEqual(data, []);
   });
 });
+
+describe('credentials resource', () => {
+  it('lists the organisation\'s sets for one system', async () => {
+    const { client, calls } = okClient([{ status: 200, body: { success: true, data: [{ _id: OID_B, application: 'square-prod', authType: 'oauth2', systemId: OID_A }], total: 1 } }]);
+    const res = await client.credentials.list({ systemId: OID_A });
+    assert.equal(calls[0]!.method, 'GET');
+    const url = new URL(calls[0]!.url);
+    assert.ok(url.pathname.endsWith('/unified/client-credentials'));
+    assert.equal(url.searchParams.get('systemId'), OID_A);
+    assert.equal(url.searchParams.get('systemIds'), null);
+    assert.equal(res.data[0]!.application, 'square-prod');
+  });
+
+  it('sends several systems comma-separated', async () => {
+    const { client, calls } = okClient([{ status: 200, body: { success: true, data: [], total: 0 } }]);
+    await client.credentials.list({ systemIds: [OID_A, OID_B] });
+    assert.equal(new URL(calls[0]!.url).searchParams.get('systemIds'), `${OID_A},${OID_B}`);
+  });
+});

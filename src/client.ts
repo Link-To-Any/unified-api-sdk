@@ -7,6 +7,7 @@
 import { HttpClient } from './http.js';
 import { AccountsResource } from './resources/accounts.js';
 import { AuthResource } from './resources/auth.js';
+import { CredentialsResource } from './resources/credentials.js';
 import { DocsResource } from './resources/docs.js';
 import { EntitiesResource } from './resources/entities.js';
 import { InstancesResource } from './resources/instances.js';
@@ -74,6 +75,8 @@ export class LinkToAny {
   readonly instances: InstancesResource;
   /** Audit trail of Unified API requests. */
   readonly requests: RequestsResource;
+  /** Your organisation's client-credential sets (the apps accounts connect through). */
+  readonly credentials: CredentialsResource;
   /** Catalogue of integrations and their read/write operations. */
   readonly integrations: IntegrationsResource;
   /** Aggregated integration documentation pulled from the platform DB. */
@@ -96,6 +99,7 @@ export class LinkToAny {
     this.templates = new TemplatesResource(this.http);
     this.instances = new InstancesResource(this.http);
     this.requests = new RequestsResource(this.http);
+    this.credentials = new CredentialsResource(this.http);
     this.integrations = new IntegrationsResource(this.http);
     this.docs = new DocsResource(this.integrations, this.entities);
     this.rateLimits = new RateLimitsResource(this.http);

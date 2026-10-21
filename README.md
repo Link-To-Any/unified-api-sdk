@@ -292,6 +292,18 @@ if (!hook.registered) {
 await client.records.registerLightspeedKWebhook(accountId, { endpointId: 'my-pos-bridge', url: 'https://hooks.example.com/lightspeed' });
 ```
 
+## Your credential sets (`client.credentials`)
+
+`client.credentials.list({ systemId })` (or `{ systemIds: [...] }`) returns the client-credential sets your organisation owns: the apps registered with each platform that accounts connect through. Shared sets are never included, and neither are secrets (`authConfig`). Pass a set's `_id` as `clientCredentialId` to `client.auth.connectAccount` to connect through exactly that set.
+
+```ts
+const { data: sets } = await client.credentials.list({ systemId });
+const result = await client.auth.connectAccount(systemId, sets[0].application, {
+  clientCredentialId: sets[0]._id,
+  successUrl: 'https://app.example.com/integrations/done',
+});
+```
+
 ## Observability (`client.requests`, `client.rateLimits`)
 
 ```ts

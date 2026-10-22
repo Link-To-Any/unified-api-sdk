@@ -14,6 +14,7 @@ export { EntitiesResource } from './resources/entities.js';
 export { TemplatesResource } from './resources/templates.js';
 export { InstancesResource } from './resources/instances.js';
 export { RequestsResource } from './resources/requests.js';
+export { CredentialsResource } from './resources/credentials.js';
 export { IntegrationsResource } from './resources/integrations.js';
 export { DocsResource } from './resources/docs.js';
 export { RateLimitsResource } from './resources/rate-limits.js';
@@ -95,6 +96,8 @@ export type {
   UnifiedInstanceGenerateRequest,
   // Request logs
   ListUnifiedRequestsQuery,
+  ListClientCredentialsQuery,
+  ClientCredentialSummary,
   UnifiedApiRequestLog,
   // Rate limits
   UpsertRateLimitRequest,

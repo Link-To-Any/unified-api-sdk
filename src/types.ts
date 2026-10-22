@@ -115,6 +115,12 @@ export interface ConnectAccountRequest {
   failureUrl?: string;
   /** @deprecated Use `successUrl`. */
   returnUrl?: string;
+  /**
+   * Connect through exactly this credential set: an `_id` from `client.credentials.list()`.
+   * It must be one of your organisation's sets for this system and `application`; any other
+   * value is ignored and the set resolved for the slug is used.
+   */
+  clientCredentialId?: ObjectId;
   /** Integration-specific fields (e.g. `shop`, `personalToken`, `apiKey`, `username`...). */
   [key: string]: unknown;
 }
@@ -1016,4 +1022,35 @@ export interface IntegrationDocumentation {
     source: 'integration' | 'readOperations' | 'writeOperations' | 'contracts';
     message: string;
   }>;
+}
+
+/** Query for {@link CredentialsResource.list}: one system, or several. */
+export interface ListClientCredentialsQuery {
+  /** Only sets for this system. Takes precedence over `systemIds`. */
+  systemId?: ObjectId;
+  /** Only sets for these systems (sent comma-separated). */
+  systemIds?: ObjectId[];
+}
+
+/**
+ * A credential set as `client.credentials.list()` returns it: owned by your
+ * organisation, without `authConfig` (no secrets).
+ */
+export interface ClientCredentialSummary {
+  _id: ObjectId;
+  /** The system id, or the system document with `name`, `supportedAuthTypes` and `baseUrl`. */
+  systemId: ObjectId | { _id: ObjectId; name?: string; supportedAuthTypes?: string[]; baseUrl?: string };
+  /** The slug passed as `application` to `client.auth.connectAccount`. */
+  application: string;
+  name?: string;
+  description?: string;
+  authType: string;
+  environment?: string;
+  status?: string;
+  /** Ownership label (`organisation` for sets created through the Unified API). */
+  scope?: string;
+  organisationId?: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
